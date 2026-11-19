@@ -121,13 +121,9 @@ async function openAiResponse(payload: Record<string, unknown>) {
 }
 
 const fallbackChatModels = [
-  { id: "gpt-6-astra", name: "GPT-6 Astra" },
-  { id: "gpt-6.1-sol", name: "GPT-6.1 Sol" },
-  { id: "gpt-6.1-terra", name: "GPT-6.1 Terra" },
-  { id: "gpt-6-luna", name: "GPT-6 Luna" },
-  { id: "gpt-6-cyber", name: "GPT-6 Cyber" },
-  { id: "gpt-5.6", name: "GPT-5.6" },
-  { id: "gpt-5.5", name: "GPT-5.5" }
+  { id: "gpt-6.2-astra", name: "GPT-6.2 Astra" },
+  { id: "chat-latest", name: "Chat Latest" },
+  { id: "gpt-5.3-codex", name: "GPT-5.3 Codex" }
 ];
 let chatModelCache: { fetchedAt: number; models: Array<{ id: string; name: string }> } = { fetchedAt: 0, models: [] };
 async function listOpenAIChatModels(force = false) {
@@ -143,7 +139,7 @@ async function listOpenAIChatModels(force = false) {
     .map((id: string) => ({ id, name: id === "chat-latest" ? "Chat Latest" : id.replace(/^gpt-/i, "GPT-").replace(/-/g, " ") }));
   const unique = Array.from(new Map(items.map((item: any) => [item.id, item])).values()) as Array<{ id: string; name: string }>;
   if (!unique.length) throw new Error("No chat-capable GPT models were returned for this API project.");
-  const priority = ["gpt-6-astra", "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-luna", "gpt-5.6", "gpt-5.5"];
+  const priority = ["gpt-6.2-astra", "chat-latest", "gpt-5.3-codex"];
   unique.sort((a,b) => {
     const ai = priority.indexOf(a.id), bi = priority.indexOf(b.id);
     if (ai >= 0 || bi >= 0) return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi);
@@ -151,6 +147,17 @@ async function listOpenAIChatModels(force = false) {
   });
   chatModelCache = { fetchedAt: Date.now(), models: unique };
   return unique;
+}
+
+function pickChatModel(models: Array<{id:string;name:string}>, preferred: string[]) {
+  const ids = new Set(models.map(item => item.id));
+  for (const candidate of preferred) if (ids.has(candidate)) return candidate;
+  return models[0]?.id || "gpt-6.2-astra";
+}
+function modelForMode(mode: string, models: Array<{id:string;name:string}>) {
+  return mode === "LIVE"
+    ? pickChatModel(models, ["chat-latest", "gpt-6.2-astra"])
+    : pickChatModel(models, ["gpt-6.2-astra", "chat-latest"]);
 }
 
 function randomCode() {
@@ -475,9 +482,9 @@ async function handler(request: Request) {
     if (url.pathname === "/api/models" && request.method === "GET") {
       try {
         const models = await listOpenAIChatModels();
-        return json({ models, defaultModel: "gpt-6.1-sol", provider: "OpenAI Platform", dynamic: !!openAiKey }, 200, origin);
+        return json({ models, defaultModel: pickChatModel(models, ["gpt-6.2-astra", "chat-latest"]), provider: "OpenAI Platform", dynamic: !!openAiKey }, 200, origin);
       } catch (error) {
-        return json({ models: fallbackChatModels, defaultModel: "gpt-6.1-sol", provider: "OpenAI Platform", dynamic: false, warning: String(error).slice(0, 240) }, 200, origin);
+        return json({ models: fallbackChatModels, defaultModel: pickChatModel(fallbackChatModels, ["gpt-6.2-astra", "chat-latest"]), provider: "OpenAI Platform", dynamic: false, warning: String(error).slice(0, 240) }, 200, origin);
       }
     }
     if (url.pathname === "/api/me" && request.method === "GET") return json({ user }, 200, origin);
@@ -796,18 +803,14 @@ async function handler(request: Request) {
       }
       if (!incoming.length || incoming.some((m: any) => !["user", "assistant"].includes(m?.role) || typeof m?.content !== "string" || m.content.length > 20000)) return json({ error: "Provide up to 40 user/assistant messages with text content." }, 400, origin);
       const mode = String(body.responseMode || body.mode || "STANDARD").toUpperCase();
-      const defaultModel = mode === "LIVE" ? "gpt-6-luna" : mode === "ADVANCED" ? "gpt-6-astra" : "gpt-6.1-sol";
+      let availableModels: Array<{ id: string; name: string }>;
+      try { availableModels = await listOpenAIChatModels(); }
+      catch (error) { return json({ error: String(error).slice(0, 240) }, 502, origin); }
       const requestedModel = String(body.modelId || body.model || "").trim();
-      let model = defaultModel;
-      if (requestedModel) {
-        let availableModels: Array<{ id: string; name: string }>;
-        try { availableModels = await listOpenAIChatModels(); }
-        catch (error) { return json({ error: String(error).slice(0, 240) }, 502, origin); }
-        if (!availableModels.some(item => item.id === requestedModel)) {
-          return json({ error: "This model is not available to your OpenAI API project. Refresh the model list and choose an available GPT model." }, 400, origin);
-        }
-        model = requestedModel;
+      if (requestedModel && !availableModels.some(item => item.id === requestedModel)) {
+        return json({ error: "This model is not available to your OpenAI API project. Refresh the model list and choose an available GPT model." }, 400, origin);
       }
+      const model = requestedModel || modelForMode(mode, availableModels);
       const familyLinks = await sql.unsafe("SELECT safe_mode,allow_images FROM expert_ai_family_members WHERE member_id=$1 AND role='child' ORDER BY created_at DESC LIMIT 1", [user.id]);
       const childSafeMode = familyLinks.length > 0 && familyLinks[0].safe_mode === true;
       const safetyInstruction = childSafeMode ? "This is a linked child account. Use age-appropriate language, avoid graphic or sexually explicit content, do not provide dangerous instructions, and encourage trusted adult support for serious concerns. " : "";
@@ -845,7 +848,7 @@ async function handler(request: Request) {
       }
       let response: any;
       const deepThinking = mode === "ADVANCED" || body.thinkingMode === "DEEP" || webTask === "DEEP_RESEARCH";
-      const effectiveModel = (webTask || (body.thinkingMode === "DEEP" && mode !== "ADVANCED")) ? "gpt-6-astra" : model;
+      const effectiveModel = (webTask || (body.thinkingMode === "DEEP" && mode !== "ADVANCED")) ? pickChatModel(availableModels, ["gpt-6.2-astra", "chat-latest"]) : model;
       const nativeTools: any[] = [];
       if (webTask) nativeTools.push({ type: "web_search", search_context_size: webTask === "DEEP_RESEARCH" ? "high" : "medium", external_web_access: true });
       if (body.taskMode === "DATA_ANALYSIS" || body.enableCodeInterpreter === true) nativeTools.push({ type: "code_interpreter", container: { type: "auto" } });
@@ -900,14 +903,18 @@ async function handler(request: Request) {
       return json({ chatId, chat: { id: chatId, title, messages, updated_at: new Date().toISOString(), temporary: body.temporary === true || !shouldPersistHistory }, answer, sources, model: effectiveModel, usage: response.usage || null }, 200, origin);
     }
     if (url.pathname === "/api/openai/test" && request.method === "POST") {
-      const response = await openAiResponse({ model: "gpt-6-luna", input: "Reply with exactly: OpenAI Platform connection successful.", max_output_tokens: 32 });
-      return json({ connected: true, provider: "OpenAI Platform", model: "gpt-6-luna", reply: extractText(response) }, 200, origin);
+      const models = await listOpenAIChatModels();
+      const model = modelForMode("LIVE",models);
+      const response = await openAiResponse({ model, input: "Reply with exactly: OpenAI Platform connection successful.", max_output_tokens: 32 });
+      return json({ connected: true, provider: "OpenAI Platform", model, reply: extractText(response) }, 200, origin);
     }
     if (url.pathname === "/api/search" && request.method === "POST") {
       const body = await parseBody(request);
       const query = String(body.query || "").trim();
       if (query.length < 2 || query.length > 2000) return json({ error: "Enter a search query." }, 400, origin);
-      const response = await openAiResponse({ model: "gpt-6-astra", input: "Search the live web for: " + query + ". Summarize reliable current findings, distinguish confirmed facts from uncertain claims, and include clickable source URLs in the answer.", tools: [{ type: "web_search", search_context_size: "high", external_web_access: true }], tool_choice: "required", max_output_tokens: 3000 });
+      const models = await listOpenAIChatModels();
+      const model = pickChatModel(models, ["gpt-6.2-astra", "chat-latest"]);
+      const response = await openAiResponse({ model, input: "Search the live web for: " + query + ". Summarize reliable current findings, distinguish confirmed facts from uncertain claims, and include clickable source URLs in the answer.", tools: [{ type: "web_search", search_context_size: "high", external_web_access: true }], tool_choice: "required", max_output_tokens: 3000 });
       return json({ answer: extractText(response), output: response.output || [] }, 200, origin);
     }
     if ((url.pathname === "/api/research" || url.pathname === "/api/research/deep") && request.method === "POST") {
@@ -924,7 +931,9 @@ async function handler(request: Request) {
       const researchPrompt = suppliedUrl
         ? "Research and summarize this public webpage: " + suppliedUrl + ". Open and inspect the page where possible, then explain its key claims, evidence, dates, limitations and useful context. Cite the source URLs."
         : query;
-      const response = await openAiResponse({ model: "gpt-6-astra", instructions: deep ? "Conduct deep, multi-angle research using live web search. Prefer primary sources, cross-check important claims, include relevant dates, distinguish fact from inference, and cite every important factual claim. Be explicit about limitations." : "Research the supplied webpage or question using live web search. Prefer primary sources and cite sources. State any limits in page access.", input: researchPrompt, tools: [{ type: "web_search", search_context_size: "high", external_web_access: true }], tool_choice: "required", reasoning: { effort: deep ? "high" : "medium" }, max_output_tokens: deep ? 7000 : 5000 });
+      const models = await listOpenAIChatModels();
+      const model = pickChatModel(models, ["gpt-6.2-astra", "chat-latest"]);
+      const response = await openAiResponse({ model, instructions: deep ? "Conduct deep, multi-angle research using live web search. Prefer primary sources, cross-check important claims, include relevant dates, distinguish fact from inference, and cite every important factual claim. Be explicit about limitations." : "Research the supplied webpage or question using live web search. Prefer primary sources and cite sources. State any limits in page access.", input: researchPrompt, tools: [{ type: "web_search", search_context_size: "high", external_web_access: true }], tool_choice: "required", reasoning: { effort: deep ? "high" : "medium" }, max_output_tokens: deep ? 7000 : 5000 });
       return json({ answer: extractText(response), summary: extractText(response), title: suppliedUrl || (query.slice(0,120)), url: suppliedUrl || null, output: response.output || [] }, 200, origin);
     }
     if ((url.pathname === "/api/images/generate" || url.pathname === "/api/images") && request.method === "POST") {
