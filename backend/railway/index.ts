@@ -437,6 +437,26 @@ async function handler(request: Request) {
     }
     return json({ service: "expert-ai-api", status: "ok", database, openai: openAiKey ? "configured" : "not_configured" }, 200, origin);
   }
+  if (request.method === "GET" && url.pathname === "/health/openai") {
+    if (!openAiKey) return json({ provider:"OpenAI Platform", connected:false, status:"not_configured" },503,origin);
+    try {
+      const models = await listOpenAIChatModels(true);
+      return json({
+        provider:"OpenAI Platform",
+        connected:true,
+        status:"valid",
+        modelCount:models.length,
+        defaultModel:pickChatModel(models,["gpt-6.2-astra","chat-latest"])
+      },200,origin);
+    } catch {
+      return json({
+        provider:"OpenAI Platform",
+        connected:false,
+        status:"key_rejected_or_model_access_unavailable",
+        message:"The server reached OpenAI, but the configured key or project model access could not be validated. Check the secret key, project permissions and billing."
+      },502,origin);
+    }
+  }
   if (url.pathname === "/api/auth/signup" && request.method === "POST") {
     if (!rateLimit(request, "signup", 5)) return json({ error: "Too many sign-up attempts. Try again later." }, 429, origin);
     if (!sql || !dbReady) return json({ error: "Database is not ready." }, 503, origin);
