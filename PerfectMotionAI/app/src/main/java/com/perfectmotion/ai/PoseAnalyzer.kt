@@ -59,7 +59,7 @@ class PoseAnalyzer(
                 )
 
                 mapping.forEach { (name, type) ->
-                    val landmark = pose.getLandmark(type)
+                    val landmark = pose.getPoseLandmark(type)
                     if (landmark != null && landmark.inFrameLikelihood >= 0.35f) {
                         val rawX = (landmark.position.x / uprightWidth).coerceIn(0f, 1f)
                         val x = 1f - rawX
