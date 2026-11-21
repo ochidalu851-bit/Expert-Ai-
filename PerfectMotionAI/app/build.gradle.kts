@@ -9,9 +9,9 @@ android {
 
     defaultConfig {
         applicationId = "com.perfectmotion.ai"
-    // Use the production PerfectMotion AI backend by default.
-    // Android CI uses the current Android SDK setup action on GitHub-hosted runners.
-        minSdk = 23
+        // Use the production PerfectMotion AI backend by default.
+        // Android CI uses the current Android SDK setup action on GitHub-hosted runners.
+        minSdk = 24
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
