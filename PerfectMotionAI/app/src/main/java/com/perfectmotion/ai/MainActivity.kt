@@ -1,10 +1,14 @@
 package com.perfectmotion.ai
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.MediaPlayer
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -16,6 +20,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,17 +31,22 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CameraAlt
-import androidx.compose.material.icons.outlined.Cloud
-import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -58,45 +68,69 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.concurrent.Executors
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        hideSystemBars()
         setContent {
             PerfectMotionTheme {
                 PerfectMotionHome()
             }
         }
     }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideSystemBars()
+    }
+
+    private fun hideSystemBars() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            hide(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
 }
 
-private val Midnight = Color(0xFF080E18)
-private val Panel = Color(0xFF111C2B)
-private val Accent = Color(0xFF55E4D0)
-private val Muted = Color(0xFF9BAABD)
+private val Midnight = Color(0xFF030817)
+private val Panel = Color(0xE6101630)
+private val Accent = Color(0xFF39DDFB)
+private val Violet = Color(0xFFB83CFF)
+private val Muted = Color(0xFFB6C3D8)
+private const val ENGLISH_VOICE_CONSENT =
+    "I am the owner of this voice and I consent to OpenAI using this voice to create a synthetic voice model."
 
 @Composable
 private fun PerfectMotionTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = darkColorScheme(
             primary = Accent,
-            secondary = Color(0xFF8AB4FF),
+            secondary = Violet,
             background = Midnight,
             surface = Panel,
             onPrimary = Midnight,
-            onBackground = Color(0xFFF2F6FA),
-            onSurface = Color(0xFFF2F6FA)
+            onBackground = Color.White,
+            onSurface = Color.White
         ),
         content = content
     )
@@ -106,14 +140,17 @@ private fun PerfectMotionTheme(content: @Composable () -> Unit) {
 private fun PerfectMotionHome() {
     val context = LocalContext.current
     val preferences = remember {
-        context.getSharedPreferences("perfect_motion_settings", android.content.Context.MODE_PRIVATE)
+        context.getSharedPreferences(
+            "perfect_motion_settings",
+            Context.MODE_PRIVATE
+        )
     }
+    val scope = rememberCoroutineScope()
 
     var uploadedImage by remember { mutableStateOf<Bitmap?>(null) }
     var avatarView by remember { mutableStateOf<AvatarMeshView?>(null) }
-    var isExporting by remember { mutableStateOf(false) }
-    var pendingExportBytes by remember { mutableStateOf<ByteArray?>(null) }
-    val coroutineScope = rememberCoroutineScope()
+    var livePose by remember { mutableStateOf<Map<String, Point2>>(emptyMap()) }
+    var referencePose by remember { mutableStateOf<Map<String, Point2>>(emptyMap()) }
     var cameraAllowed by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -122,31 +159,33 @@ private fun PerfectMotionHome() {
             ) == PackageManager.PERMISSION_GRANTED
         )
     }
-    var livePose by remember { mutableStateOf<Map<String, Point2>>(emptyMap()) }
-    var referencePose by remember { mutableStateOf<Map<String, Point2>>(emptyMap()) }
-    var status by remember { mutableStateOf("Upload a full-body image to begin") }
+    var status by remember { mutableStateOf("Upload a full-body photo to start motion mirroring.") }
     var isPreparing by remember { mutableStateOf(false) }
     var isSegmenting by remember { mutableStateOf(false) }
-    var showSettings by remember { mutableStateOf(false) }
-    var serverUrl by remember {
-        mutableStateOf(
-            preferences.getString("server_url", BuildConfig.DEFAULT_AI_SERVER_URL) ?: ""
-        )
+    var isExporting by remember { mutableStateOf(false) }
+    var isCreatingVoice by remember { mutableStateOf(false) }
+    var pendingExportBytes by remember { mutableStateOf<ByteArray?>(null) }
+    var showVoiceDialog by remember { mutableStateOf(false) }
+    var voiceName by remember {
+        mutableStateOf(preferences.getString("voice_name", "My voice") ?: "My voice")
     }
-    var appToken by remember {
-        mutableStateOf(preferences.getString("app_token", "") ?: "")
+    var savedVoiceId by remember {
+        mutableStateOf(preferences.getString("voice_id", "") ?: "")
     }
-    var serverUrlDraft by remember { mutableStateOf(serverUrl) }
-    var tokenDraft by remember { mutableStateOf(appToken) }
+    var consentAudio by remember { mutableStateOf<AudioUpload?>(null) }
+    var sampleAudio by remember { mutableStateOf<AudioUpload?>(null) }
+    var ownerConsent by remember { mutableStateOf(false) }
+    var voiceError by remember { mutableStateOf("") }
+    var audioPickTarget by remember { mutableStateOf("consent") }
 
     val cameraPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         cameraAllowed = granted
         status = if (granted) {
-            "Camera is ready. Stand back so your full body is visible."
+            "Camera tracking is ready. Keep your full body in view."
         } else {
-            "Camera permission is needed to mirror your movement."
+            "Camera access is needed to mirror your movement."
         }
     }
 
@@ -160,12 +199,12 @@ private fun PerfectMotionHome() {
                     output.write(bytes)
                 } ?: error("Could not open the selected save location.")
             }.onSuccess {
-                status = "8K upscaled frame saved successfully."
+                status = "8K upscaled image saved."
             }.onFailure { error ->
-                status = "Could not save export: ${error.message ?: "storage error"}"
+                status = "Export could not be saved: ${error.message ?: "storage error"}"
             }
         } else if (uri == null) {
-            status = "8K export cancelled."
+            status = "Export cancelled."
         }
         pendingExportBytes = null
     }
@@ -181,29 +220,29 @@ private fun PerfectMotionHome() {
             }.getOrNull()
 
             if (decoded == null) {
-                status = "That image could not be opened. Please choose another image."
+                status = "The selected image could not be opened."
             } else {
                 uploadedImage = decoded
                 referencePose = emptyMap()
                 livePose = emptyMap()
                 isSegmenting = true
-                status = "Separating the person from the photo background and opening your front camera…"
+                status = "Isolating the person in your photo…"
 
-                ImageSubjectSegmenter.cutOut(decoded) { cutout, segmentationError ->
+                ImageSubjectSegmenter.cutOut(decoded) { cutout, _ ->
                     uploadedImage = cutout ?: decoded
                     isSegmenting = false
                     status = if (cutout != null) {
                         "Person isolated. Preparing the motion rig…"
                     } else {
-                        "Using the original photo. Background isolation was not available for this image."
+                        "Using the photo as uploaded. Preparing motion tracking…"
                     }
                 }
 
-                val hasPermission = ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.CAMERA
-                ) == PackageManager.PERMISSION_GRANTED
-                if (hasPermission) {
+                if (ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.CAMERA
+                    ) == PackageManager.PERMISSION_GRANTED
+                ) {
                     cameraAllowed = true
                 } else {
                     cameraPermission.launch(Manifest.permission.CAMERA)
@@ -212,365 +251,508 @@ private fun PerfectMotionHome() {
         }
     }
 
-    LaunchedEffect(uploadedImage, serverUrl, appToken, isSegmenting) {
-        if (isSegmenting) return@LaunchedEffect
-        val image = uploadedImage ?: return@LaunchedEffect
-        if (serverUrl.isBlank() || appToken.isBlank()) {
-            status = if (cameraAllowed) {
-                "Camera tracking is on. Add your AI server URL and app token in Settings to prepare the image rig."
-            } else {
-                "Image loaded. Allow camera access and connect the AI server in Settings."
+    val audioPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val audio = withContext(Dispatchers.IO) {
+                    readAudioUpload(context, uri)
+                }
+                if (audio == null) {
+                    voiceError = "Could not read that audio file."
+                } else if (audio.bytes.size > 10 * 1024 * 1024) {
+                    voiceError = "Each voice recording must be 10 MB or smaller."
+                } else if (!isSupportedVoiceMime(audio.mimeType)) {
+                    voiceError = "Choose MP3, WAV, OGG, AAC, FLAC, WEBM or MP4 audio."
+                } else {
+                    if (audioPickTarget == "consent") {
+                        consentAudio = audio
+                        voiceError = "Consent recording selected."
+                    } else {
+                        sampleAudio = audio
+                        voiceError = "Voice sample selected."
+                    }
+                }
             }
-            return@LaunchedEffect
         }
+    }
+
+    LaunchedEffect(uploadedImage, isSegmenting) {
+        val image = uploadedImage ?: return@LaunchedEffect
+        if (isSegmenting) return@LaunchedEffect
 
         isPreparing = true
-        status = if (isSegmenting) "Separating the subject…" else "OpenAI is analysing the isolated subject and locating body landmarks…"
+        status = "AI is locating body joints in your uploaded image…"
         try {
             val joints = withContext(Dispatchers.IO) {
-                MotionAiClient.prepareAvatar(
-                    image = image,
-                    baseUrl = serverUrl,
-                    appToken = appToken
-                )
+                MotionAiClient.prepareAvatar(image)
             }
             referencePose = joints
             status = if (joints.size >= 5) {
-                "AI rig prepared. Move in front of the camera to animate the image."
+                "Ready. Move in front of the small camera preview."
             } else {
-                "AI could not find enough visible body joints. Try a clear, full-body photo."
+                "Not enough body landmarks were found. Try a clear, full-body photo."
             }
         } catch (error: Exception) {
-            status = "AI preparation failed: ${error.message ?: "check your server settings"}"
+            status = "Image preparation failed: ${error.message ?: "check your connection"}"
         } finally {
             isPreparing = false
         }
     }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = Midnight
-    ) {
-        Column(
+    Surface(modifier = Modifier.fillMaxSize(), color = Midnight) {
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Midnight)
-                .padding(horizontal = 16.dp, vertical = 14.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text(
-                        text = "PERFECTMOTION",
-                        color = Color.White,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 1.8.sp
-                    )
-                    Text(
-                        text = "AI MOTION MIRROR",
-                        color = Accent,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.4.sp
-                    )
-                }
-                IconButton(onClick = {
-                    serverUrlDraft = serverUrl
-                    tokenDraft = appToken
-                    showSettings = true
-                }) {
-                    Icon(
-                        imageVector = Icons.Outlined.Settings,
-                        contentDescription = "Settings",
-                        tint = Color.White
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(330.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Card(
-                    modifier = Modifier.weight(1f).fillMaxSize(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = Panel)
-                ) {
-                    Column(Modifier.fillMaxSize().padding(9.dp)) {
-                        PanelTitle("YOUR IMAGE", Icons.Outlined.Image)
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(Color(0xFF09121F)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (uploadedImage != null) {
-                                AndroidView(
-                                    factory = { viewContext ->
-                                        AvatarMeshView(viewContext).also { avatarView = it }
-                                    },
-                                    modifier = Modifier.fillMaxSize(),
-                                    update = {
-                                        it.setFrame(uploadedImage, referencePose, livePose)
-                                        avatarView = it
-                                    }
-                                )
-                            } else {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Image,
-                                        contentDescription = null,
-                                        tint = Accent,
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                    Spacer(Modifier.height(8.dp))
-                                    Text(
-                                        "Upload a person",
-                                        color = Color.White,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Text(
-                                        "Full body works best",
-                                        color = Muted,
-                                        fontSize = 10.sp
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Card(
-                    modifier = Modifier.weight(1f).fillMaxSize(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = Panel)
-                ) {
-                    Column(Modifier.fillMaxSize().padding(9.dp)) {
-                        PanelTitle("LIVE CAMERA", Icons.Outlined.CameraAlt)
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(Color(0xFF09121F)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            when {
-                                uploadedImage == null -> Text(
-                                    "Camera opens after upload",
-                                    color = Muted,
-                                    fontSize = 11.sp
-                                )
-                                !cameraAllowed -> Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        "Camera permission needed",
-                                        color = Color.White,
-                                        fontSize = 11.sp
-                                    )
-                                    Spacer(Modifier.height(8.dp))
-                                    Button(
-                                        onClick = {
-                                            cameraPermission.launch(Manifest.permission.CAMERA)
-                                        },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = Accent,
-                                            contentColor = Midnight
-                                        )
-                                    ) {
-                                        Text("Enable camera", fontSize = 11.sp)
-                                    }
-                                }
-                                else -> CameraMirrorPane(
-                                    onPose = { livePose = it }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(14.dp))
-
-            Button(
-                onClick = { imagePicker.launch("image/*") },
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Accent,
-                    contentColor = Midnight
-                )
-            ) {
-                Icon(Icons.Outlined.Image, contentDescription = null)
-                Spacer(Modifier.size(8.dp))
-                Text(
-                    if (uploadedImage == null) "UPLOAD IMAGE & OPEN CAMERA" else "CHANGE IMAGE",
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.5.sp
-                )
-            }
-
             if (uploadedImage != null) {
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = {
-                        val frame = avatarView?.renderFullResolutionFrame()
-                        when {
-                            frame == null -> status = "The motion frame is not ready yet."
-                            serverUrl.isBlank() || appToken.isBlank() -> {
-                                status = "Open Settings and add the AI server URL and app access token before exporting."
-                            }
-                            else -> {
-                                isExporting = true
-                                status = "Preparing the 8K upscaled frame…"
-                                coroutineScope.launch {
-                                    try {
-                                        val bytes = withContext(Dispatchers.IO) {
-                                            MotionAiClient.export8kFrame(
-                                                image = frame,
-                                                baseUrl = serverUrl,
-                                                appToken = appToken
-                                            )
-                                        }
-                                        pendingExportBytes = bytes
-                                        status = "Choose where to save your 8K upscaled frame."
-                                        exportFilePicker.launch("PerfectMotionAI-8K.webp")
-                                    } catch (error: Exception) {
-                                        status = "8K export failed: ${error.message ?: "check the AI server"}"
-                                    } finally {
-                                        isExporting = false
-                                    }
-                                }
-                            }
-                        }
+                AndroidView(
+                    factory = { viewContext ->
+                        AvatarMeshView(viewContext).also { avatarView = it }
                     },
-                    enabled = !isExporting && referencePose.size >= 5,
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = RoundedCornerShape(15.dp)
-                ) {
-                    Text(
-                        if (isExporting) "PREPARING 8K EXPORT…" else "EXPORT CURRENT FRAME · 8K UPSCALED",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Panel)
-            ) {
-                Column(Modifier.padding(14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Outlined.Cloud,
-                            contentDescription = null,
-                            tint = Accent,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.size(8.dp))
-                        Text(
-                            "MOTION STATUS",
-                            color = Accent,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
-                            letterSpacing = 1.2.sp
-                        )
-                        Spacer(Modifier.weight(1f))
-                        if (isPreparing) {
-                            Text("AI WORKING", color = Color(0xFFFFD166), fontSize = 9.sp)
-                        } else if (cameraAllowed && livePose.isNotEmpty()) {
-                            Text("TRACKING", color = Accent, fontSize = 9.sp)
-                        }
+                    modifier = Modifier.fillMaxSize(),
+                    update = { view ->
+                        view.setFrame(uploadedImage, referencePose, livePose)
+                        avatarView = view
                     }
+                )
+            } else {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(horizontal = 30.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        Icons.Filled.Image,
+                        contentDescription = null,
+                        tint = Accent,
+                        modifier = Modifier.size(68.dp)
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    Text(
+                        "Your photo appears here",
+                        color = Color.White,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
                     Spacer(Modifier.height(7.dp))
                     Text(
-                        status,
-                        color = Color(0xFFE5EDF6),
+                        "Upload a clear, full-body image. It will fill the screen while your live camera stays in a small preview.",
+                        color = Muted,
+                        fontSize = 13.sp,
+                        lineHeight = 19.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(18.dp))
+                    Button(
+                        onClick = { imagePicker.launch("image/*") },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Accent,
+                            contentColor = Midnight
+                        )
+                    ) {
+                        Icon(Icons.Filled.UploadFile, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Upload image", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 18.dp, top = 18.dp)
+            ) {
+                Text(
+                    "PerfectMotion AI",
+                    color = Color.White,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 20.sp
+                )
+                Text(
+                    "LIVE MOTION MIRROR",
+                    color = Accent,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 9.sp,
+                    letterSpacing = 2.sp
+                )
+            }
+
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 16.dp, end = 14.dp)
+                    .size(width = 116.dp, height = 158.dp),
+                shape = RoundedCornerShape(22.dp),
+                color = Color(0xFF080B18),
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, Accent)
+            ) {
+                Box(Modifier.fillMaxSize()) {
+                    when {
+                        !cameraAllowed -> Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                Icons.Filled.CameraAlt,
+                                contentDescription = null,
+                                tint = Accent,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(Modifier.height(5.dp))
+                            Text(
+                                "Camera",
+                                color = Color.White,
+                                fontSize = 11.sp
+                            )
+                            Text(
+                                "Enable",
+                                color = Accent,
+                                fontSize = 10.sp
+                            )
+                            IconButton(
+                                onClick = {
+                                    cameraPermission.launch(Manifest.permission.CAMERA)
+                                },
+                                modifier = Modifier.size(34.dp)
+                            ) {
+                                Icon(
+                                    Icons.Filled.CameraAlt,
+                                    contentDescription = "Enable camera",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                        uploadedImage == null -> Text(
+                            "Your camera",
+                            modifier = Modifier.align(Alignment.Center),
+                            color = Muted,
+                            fontSize = 11.sp
+                        )
+                        else -> CameraMirrorPane(
+                            modifier = Modifier.fillMaxSize(),
+                            onPose = { livePose = it }
+                        )
+                    }
+                    Text(
+                        "YOU",
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(7.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xAA030817))
+                            .padding(horizontal = 7.dp, vertical = 3.dp),
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 9.sp
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 14.dp)
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(24.dp),
+                    color = Panel,
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        Color.White.copy(alpha = 0.10f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (livePose.isNotEmpty()) Color(0xFF48E59A)
+                                        else if (isPreparing) Color(0xFFFFC857)
+                                        else Muted
+                                    )
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                when {
+                                    isPreparing -> "PREPARING IMAGE"
+                                    livePose.isNotEmpty() && referencePose.size >= 5 -> "LIVE TRACKING"
+                                    referencePose.size >= 5 -> "READY FOR MOVEMENT"
+                                    else -> "MOTION STATUS"
+                                },
+                                color = Accent,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp
+                            )
+                            Spacer(Modifier.weight(1f))
+                            if (savedVoiceId.isNotBlank()) {
+                                Text(
+                                    "VOICE SAVED",
+                                    color = Color(0xFF8DEAB5),
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            status,
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp,
+                            maxLines = 2
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            ActionButton(
+                                icon = Icons.Filled.Image,
+                                label = "PHOTO",
+                                onClick = { imagePicker.launch("image/*") }
+                            )
+                            ActionButton(
+                                icon = Icons.Filled.Mic,
+                                label = if (savedVoiceId.isBlank()) "UPLOAD VOICE" else "MY VOICE",
+                                onClick = {
+                                    voiceError = ""
+                                    consentAudio = null
+                                    sampleAudio = null
+                                    ownerConsent = false
+                                    showVoiceDialog = true
+                                },
+                                highlighted = true
+                            )
+                            ActionButton(
+                                icon = Icons.Filled.Download,
+                                label = "8K EXPORT",
+                                onClick = {
+                                    val frame = avatarView?.renderFullResolutionFrame()
+                                    if (frame == null) {
+                                        status = "The motion frame is not ready yet."
+                                    } else if (referencePose.size < 5) {
+                                        status = "Wait until the image motion rig is ready."
+                                    } else {
+                                        isExporting = true
+                                        status = "Preparing the current frame for 8K export…"
+                                        scope.launch {
+                                            try {
+                                                val bytes = withContext(Dispatchers.IO) {
+                                                    MotionAiClient.export8kFrame(frame)
+                                                }
+                                                pendingExportBytes = bytes
+                                                exportFilePicker.launch("PerfectMotionAI-8K.webp")
+                                            } catch (error: Exception) {
+                                                status = "8K export failed: ${error.message ?: "server error"}"
+                                            } finally {
+                                                isExporting = false
+                                            }
+                                        }
+                                    }
+                                },
+                                enabled = !isExporting && referencePose.size >= 5
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showVoiceDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!isCreatingVoice) showVoiceDialog = false },
+            title = { Text("Your preferred AI voice") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(9.dp)
+                ) {
+                    Text(
+                        "Upload a consent recording and a voice sample from the same adult speaker. This creates a reusable synthetic voice when your OpenAI project has custom-voice access.",
                         fontSize = 12.sp,
                         lineHeight = 17.sp
                     )
-                    Spacer(Modifier.height(7.dp))
+                    OutlinedTextField(
+                        value = voiceName,
+                        onValueChange = { voiceName = it },
+                        label = { Text("Voice name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                     Text(
-                        "Camera frames are processed on this phone. Only the uploaded image is sent to your configured AI server for landmark analysis.",
+                        "Required consent sentence (English):",
+                        color = Accent,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    )
+                    Text(
+                        ENGLISH_VOICE_CONSENT,
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            audioPickTarget = "consent"
+                            audioPicker.launch("audio/*")
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.UploadFile, contentDescription = null)
+                        Spacer(Modifier.width(7.dp))
+                        Text(
+                            consentAudio?.name ?: "Upload consent recording",
+                            maxLines = 1
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            audioPickTarget = "sample"
+                            audioPicker.launch("audio/*")
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.Mic, contentDescription = null)
+                        Spacer(Modifier.width(7.dp))
+                        Text(
+                            sampleAudio?.name ?: "Upload preferred voice sample",
+                            maxLines = 1
+                        )
+                    }
+                    Text(
+                        "Use a quiet 10–60 second sample with at least five seconds of actual speech and 15 or more spoken text tokens. Each file must be 10 MB or smaller. The consent and sample must be the same adult speaker.",
                         color = Muted,
                         fontSize = 10.sp,
                         lineHeight = 14.sp
                     )
-                }
-            }
-
-            Spacer(Modifier.height(10.dp))
-            Text(
-                "Tip: use a clear, front-facing, full-body image and keep your whole body visible in the camera.",
-                color = Muted,
-                fontSize = 10.sp,
-                lineHeight = 14.sp
-            )
-        }
-    }
-
-    if (showSettings) {
-        AlertDialog(
-            onDismissRequest = { showSettings = false },
-            title = { Text("AI connection") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        "Enter the HTTPS URL of your PerfectMotion AI server and its app token. Never paste your OpenAI API key here.",
-                        fontSize = 12.sp
-                    )
-                    OutlinedTextField(
-                        value = serverUrlDraft,
-                        onValueChange = { serverUrlDraft = it },
-                        label = { Text("AI server URL") },
-                        placeholder = { Text("https://your-server.example.com") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = tokenDraft,
-                        onValueChange = { tokenDraft = it },
-                        label = { Text("App access token") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = ownerConsent,
+                            onCheckedChange = { ownerConsent = it }
+                        )
+                        Text(
+                            "I own this voice or have the speaker's explicit permission.",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            lineHeight = 14.sp
+                        )
+                    }
+                    if (voiceError.isNotBlank()) {
+                        Text(
+                            voiceError,
+                            color = if (voiceError.startsWith("Voice created")) Color(0xFF8DEAB5) else Color(0xFFFFC1C1),
+                            fontSize = 11.sp
+                        )
+                    }
+                    if (savedVoiceId.isNotBlank()) {
+                        Text(
+                            "Saved voice on this device: ${preferences.getString("voice_name", "My voice")}",
+                            color = Color(0xFF8DEAB5),
+                            fontSize = 11.sp
+                        )
+                        OutlinedButton(
+                            onClick = {
+                                scope.launch {
+                                    try {
+                                        status = "Generating a short voice preview…"
+                                        val audio = withContext(Dispatchers.IO) {
+                                            MotionAiClient.synthesizeSpeechPreview(
+                                                "Hello! This is my preferred voice in PerfectMotion AI.",
+                                                savedVoiceId
+                                            )
+                                        }
+                                        playAudioPreview(context, audio) {
+                                            status = it
+                                        }
+                                    } catch (error: Exception) {
+                                        voiceError = error.message ?: "Voice preview failed."
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Preview saved voice")
+                        }
+                    }
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    serverUrl = serverUrlDraft.trim().trimEnd('/')
-                    appToken = tokenDraft.trim()
-                    preferences.edit()
-                        .putString("server_url", serverUrl)
-                        .putString("app_token", appToken)
-                        .apply()
-                    showSettings = false
-                }) {
-                    Text("Save")
+                Button(
+                    enabled = !isCreatingVoice &&
+                        voiceName.isNotBlank() &&
+                        consentAudio != null &&
+                        sampleAudio != null &&
+                        ownerConsent,
+                    onClick = {
+                        val consent = consentAudio
+                        val sample = sampleAudio
+                        if (consent == null || sample == null) return@Button
+                        isCreatingVoice = true
+                        voiceError = "Uploading consent and creating your voice…"
+                        scope.launch {
+                            try {
+                                val consentId = withContext(Dispatchers.IO) {
+                                    MotionAiClient.createVoiceConsent(
+                                        voiceName.trim(),
+                                        "en",
+                                        consent
+                                    )
+                                }
+                                val voiceId = withContext(Dispatchers.IO) {
+                                    MotionAiClient.createCustomVoice(
+                                        voiceName.trim(),
+                                        consentId,
+                                        sample
+                                    )
+                                }
+                                savedVoiceId = voiceId
+                                preferences.edit()
+                                    .putString("voice_id", voiceId)
+                                    .putString("voice_name", voiceName.trim())
+                                    .apply()
+                                voiceError = "Voice created and saved on this device."
+                                status = "Your preferred voice is ready for speech previews."
+                            } catch (error: Exception) {
+                                voiceError = error.message
+                                    ?: "Voice creation failed. Check custom-voice access in your OpenAI project."
+                            } finally {
+                                isCreatingVoice = false
+                            }
+                        }
+                    }
+                ) {
+                    Text(if (isCreatingVoice) "Creating…" else "Create my voice")
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = { showSettings = false }) {
-                    Text("Cancel")
+                OutlinedButton(
+                    onClick = { showVoiceDialog = false },
+                    enabled = !isCreatingVoice
+                ) {
+                    Text("Close")
                 }
             }
         )
@@ -578,28 +760,115 @@ private fun PerfectMotionHome() {
 }
 
 @Composable
-private fun PanelTitle(
+private fun ActionButton(
+    icon: ImageVector,
     label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector
+    onClick: () -> Unit,
+    highlighted: Boolean = false,
+    enabled: Boolean = true
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(icon, contentDescription = null, tint = Accent, modifier = Modifier.size(14.dp))
-        Spacer(Modifier.size(5.dp))
+        IconButton(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = Modifier
+                .size(52.dp)
+                .clip(CircleShape)
+                .background(
+                    if (highlighted) Accent.copy(alpha = 0.18f)
+                    else Color.White.copy(alpha = 0.08f)
+                )
+                .border(
+                    1.dp,
+                    if (highlighted) Accent else Color.White.copy(alpha = 0.18f),
+                    CircleShape
+                )
+        ) {
+            Icon(
+                icon,
+                contentDescription = label,
+                tint = if (highlighted) Accent else Color.White,
+                modifier = Modifier.size(23.dp)
+            )
+        }
+        Spacer(Modifier.height(4.dp))
         Text(
             label,
-            color = Color.White,
+            color = if (enabled) Color.White else Muted,
+            fontSize = 8.sp,
             fontWeight = FontWeight.Bold,
-            fontSize = 9.sp,
-            letterSpacing = 0.8.sp
+            letterSpacing = 0.3.sp
         )
     }
+}
+
+private fun readAudioUpload(context: Context, uri: Uri): AudioUpload? {
+    val mime = context.contentResolver.getType(uri)
+        ?.substringBefore(";")
+        ?.lowercase()
+        ?: "audio/mpeg"
+    val name = runCatching {
+        context.contentResolver.query(
+            uri,
+            arrayOf(OpenableColumns.DISPLAY_NAME),
+            null,
+            null,
+            null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
+            } else null
+        }
+    }.getOrNull() ?: "voice-recording"
+    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
+    return AudioUpload(name, mime, bytes)
+}
+
+private fun isSupportedVoiceMime(mime: String): Boolean {
+    return mime in setOf(
+        "audio/mpeg",
+        "audio/wav",
+        "audio/x-wav",
+        "audio/ogg",
+        "audio/aac",
+        "audio/flac",
+        "audio/webm",
+        "audio/mp4"
+    )
+}
+
+private fun playAudioPreview(
+    context: Context,
+    bytes: ByteArray,
+    onStatus: (String) -> Unit
+) {
+    val file = File(context.cacheDir, "perfectmotion-voice-preview.mp3")
+    file.writeBytes(bytes)
+    val player = MediaPlayer()
+    player.setOnPreparedListener {
+        it.start()
+        onStatus("Playing your saved voice preview.")
+    }
+    player.setOnCompletionListener {
+        it.release()
+        file.delete()
+        onStatus("Voice preview finished.")
+    }
+    player.setOnErrorListener { mediaPlayer, _, _ ->
+        mediaPlayer.release()
+        file.delete()
+        onStatus("Could not play the voice preview.")
+        true
+    }
+    player.setDataSource(file.absolutePath)
+    player.prepareAsync()
 }
 
 @Composable
 private fun CameraMirrorPane(
+    modifier: Modifier = Modifier,
     onPose: (Map<String, Point2>) -> Unit
 ) {
     val context = LocalContext.current
@@ -608,7 +877,7 @@ private fun CameraMirrorPane(
     var overlayPose by remember { mutableStateOf<Map<String, Point2>>(emptyMap()) }
     val previewView = remember(context) {
         PreviewView(context).apply {
-            scaleType = PreviewView.ScaleType.FIT_CENTER
+            scaleType = PreviewView.ScaleType.FILL_CENTER
             implementationMode = PreviewView.ImplementationMode.COMPATIBLE
         }
     }
@@ -630,16 +899,13 @@ private fun CameraMirrorPane(
                 runCatching {
                     val cameraProvider = future.get()
                     provider = cameraProvider
-
                     val preview = Preview.Builder()
                         .build()
                         .also { it.setSurfaceProvider(previewView.surfaceProvider) }
-
                     val analysis = ImageAnalysis.Builder()
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build()
                         .also { it.setAnalyzer(executor, analyzer) }
-
                     cameraProvider.unbindAll()
                     cameraProvider.bindToLifecycle(
                         lifecycleOwner,
@@ -659,7 +925,7 @@ private fun CameraMirrorPane(
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
+    Box(modifier) {
         AndroidView(
             factory = { previewView },
             modifier = Modifier.fillMaxSize()
@@ -671,7 +937,7 @@ private fun CameraMirrorPane(
                 val end = currentPose[endName]
                 if (start != null && end != null) {
                     drawLine(
-                        color = Accent.copy(alpha = 0.85f),
+                        color = Accent.copy(alpha = 0.82f),
                         start = androidx.compose.ui.geometry.Offset(
                             start.x * size.width,
                             start.y * size.height
@@ -680,14 +946,14 @@ private fun CameraMirrorPane(
                             end.x * size.width,
                             end.y * size.height
                         ),
-                        strokeWidth = 2.2f
+                        strokeWidth = 2f
                     )
                 }
             }
             currentPose.values.forEach { point ->
                 drawCircle(
                     color = Accent,
-                    radius = 3.5f,
+                    radius = 3f,
                     center = androidx.compose.ui.geometry.Offset(
                         point.x * size.width,
                         point.y * size.height
