@@ -1,74 +1,59 @@
 # PerfectMotion AI
 
-PerfectMotion AI is a separate Android motion-mirroring app. The Android project is in this folder; the OpenAI-backed image preparation service is in `server/`.
+PerfectMotion AI is an Android app for live camera-driven 2D movement mirroring. The Android project is in this folder; the OpenAI-backed preparation and voice service is in `server/`.
 
-## What is implemented
+## Android experience
 
-- Pick an image from the phone. The app then requests camera permission and opens the front camera.
-- Show the uploaded image and front-camera preview side by side.
-- Run Google ML Kit pose detection on-device using CameraX streaming frames.
-- Draw a live pose skeleton over the camera preview.
-- Send only the selected still image to the configured AI server. The server uses the OpenAI Responses API to estimate normalized body-joint locations.
-- Separate the uploaded person from the background on-device using ML Kit selfie segmentation.
-- Deform a 2D bitmap mesh using those image landmarks and the live camera landmarks.
-- Export the current rendered still frame through a server-side 8K canvas upscaler (7680x4320 landscape or 4320x7680 portrait).
-- Keep the OpenAI API key on the server, never in the Android application.
+- Choose a person photo from the phone.
+- The uploaded person fills the screen; the front-camera preview stays in a small floating window.
+- Android status and navigation bars are hidden during the motion experience to provide an immersive full-screen view.
+- CameraX streams front-camera frames and Google ML Kit estimates pose landmarks on-device.
+- The live camera landmarks are used immediately to deform a 2D mesh of the uploaded photo.
+- ML Kit selfie segmentation attempts to isolate the person before animation.
+- The user can export the current rendered still frame as an 8K-sized WebP.
+- The launcher graphic is included in `app/src/main/res/mipmap-anydpi/ic_launcher.xml`.
 
-## Android build
+Minimum Android version: Android 7.0 (API 24).
 
-Open this folder in Android Studio with Android SDK 37 and JDK 17 installed, or use the GitHub Actions workflow at `.github/workflows/perfectmotion-ai-android.yml`.
+## Custom voice upload
 
-The workflow builds a debug APK and publishes it as an artifact named `PerfectMotionAI-debug-apk`. The application ID is `com.perfectmotion.ai.debug` for the debug build.
+The app includes an upload flow for a user's preferred recorded voice. It asks for two recordings from the same adult speaker:
 
-## OpenAI image service
+1. A consent recording using the exact supported OpenAI consent sentence shown in the app.
+2. A 10–60 second voice sample with at least five seconds of speech and at least 15 spoken text tokens.
 
-The live service is deployed at:
+Both files must be 10 MiB or smaller and use one of the supported audio MIME types. The app submits the recordings to the OpenAI custom-voice endpoints and lets the user preview a saved voice with a short generated speech sample.
+
+**Important limitations:**
+- Recording-based custom voice creation is restricted to OpenAI organisations that have been granted access. The upload will return an explanatory error when the project is not enabled.
+- The custom voice ID is currently saved in local app preferences on that device. This project does not yet have user accounts or cloud profile sync.
+- This is a voice-upload and speech-preview workflow; full duplex, real-time conversational voice calling is not implemented yet.
+- The speaker must own the voice or give explicit permission. Do not impersonate another person.
+
+## OpenAI backend
+
+The live backend URL is fixed in the Android build configuration:
 
 `https://perfectmotion-ai-api-production.up.railway.app`
 
-Railway project: `PerfectMotion AI`. Service: `perfectmotion-ai-api`. The Android Gradle config now pre-fills this HTTPS URL.
+The OpenAI API key stays on Railway and is never included in the APK or exposed in the app Settings screen.
 
-Set these server environment variables in the Railway service's Variables tab:
+Required Railway service variables:
 
-- `OPENAI_API_KEY`: a newly rotated project API key created in OpenAI Platform. Never use an API key pasted into chat or committed to GitHub.
-- `OPENAI_VISION_MODEL`: defaults to `gpt-6.2-astra`, a vision-capable Responses API model.
-- `PERFECTMOTION_API_TOKEN`: a long random app access token shared with the Android app.
+- `OPENAI_API_KEY`: the rotated OpenAI Platform project API key.
+- `OPENAI_VISION_MODEL`: optional; defaults to `gpt-6.2-astra`.
 - `PORT`: optional; defaults to `8080`.
 
-For example, create an app token with `openssl rand -hex 32`. Put the token in the server's secret settings and in the app's Settings screen. Do not use the OpenAI API key as the app token.
+The Android app no longer exposes an AI server URL or app access-token field. The backend currently uses an IP-based request limit (20 requests per IP per hour) rather than per-user authentication. **This is not a complete production security boundary**; before releasing to a broad public audience, add sign-in and short-lived per-user server sessions.
 
-The Android app's Settings screen takes:
-1. The deployed HTTPS server URL.
-2. The app access token.
+## Build
 
-After saving both values, upload an image again to run the AI rig-preparation step. The app also provides an 8K-upscaled still-frame export button once the image rig has been prepared.
+The GitHub Actions workflow at `.github/workflows/perfectmotion-ai-android.yml` builds a debug APK and publishes the artifact named `PerfectMotionAI-debug-apk`.
 
-### Where to put your OpenAI API key
+The debug application ID is `com.perfectmotion.ai.debug`. The Android project is configured for Android API 24 or newer and uses Java 17.
 
-Never paste the OpenAI API key into a GitHub source file, Android Settings, or this chat. Put it in the backend host's encrypted environment variables:
+## Motion and export limits
 
-1. Open the PerfectMotion AI project in Railway.
-2. Open the `perfectmotion-ai-api` service and select **Variables**.
-3. Add `OPENAI_API_KEY` and paste the key value there.
-4. Add `PERFECTMOTION_API_TOKEN` with a separate random app token, not the OpenAI key.
-5. Deploy/redeploy the service after saving.
+The live movement effect is a local, real-time **2D mesh warp** driven by estimated body landmarks. It is not a full 3D reconstruction or a generated motion-synthesis video. A single still photo cannot reveal hidden body parts or the back of a person, and the result depends on source-image quality and visible joints.
 
-The Railway service is now deployed from the `perfectmotion-ai` branch. Its root directory is `/PerfectMotionAI/server`, Dockerfile is `Dockerfile`, and health check path is `/health`. The OpenAI API key is intentionally not configured yet because the key pasted into chat is exposed and must be revoked first.
-
-## Motion and output quality
-
-Camera frames are analysed locally with ML Kit and are not sent to the AI server. Only the selected, background-isolated still image is uploaded for body-landmark estimation. The server requests `store: false` from the Responses API and does not save the image.
-
-The export endpoint creates an 8K-sized canvas and uses Lanczos resampling to enlarge the rendered frame. This is 8K upscaling, not native 8K detail generation. OpenAI's current image-generation API maximum is 3840x2160, so the 8K export step enlarges pixels rather than recovering details absent from the original.
-
-This build uses image landmarks and a 2D mesh deformation rig. Segmentation reduces background warping, but this is not yet a full 3D reconstruction, motion-synthesis video engine, or a guarantee of anatomically perfect movement. Hidden limbs and body parts not visible in the source photo cannot be recreated faithfully from the single image.
-
-## Project layout
-
-- `app/`: Kotlin + Jetpack Compose Android app.
-- `server/`: Node.js OpenAI Responses API service.
-- `.github/workflows/perfectmotion-ai-android.yml`: APK build workflow.
-
-## Build versions
-
-The project uses Android Gradle Plugin 9.5.0, Gradle 9.6.0 in CI, Kotlin 2.4.10, Compose BOM 2026.09.00, CameraX 1.7.0, and ML Kit Pose Detection 18.0.0-beta5.
+The 8K export creates an 8K-sized canvas and upscales the current rendered frame. This is 8K upscaling, not native 8K detail recovery.
