@@ -1,8 +1,9 @@
 import { createServer } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
+import sharp from 'sharp';
 
 const PORT = Number(process.env.PORT || 8080);
-const MAX_BODY_BYTES = 12 * 1024 * 1024;
+const MAX_BODY_BYTES = 32 * 1024 * 1024;
 const allowedJoints = new Set([
   'nose',
   'left_shoulder', 'right_shoulder',
@@ -23,6 +24,30 @@ function sendJson(response, status, body) {
     'Access-Control-Allow-Headers': 'Content-Type, X-App-Token'
   });
   response.end(JSON.stringify(body));
+}
+
+function sendBinary(response, status, body, contentType, headers = {}) {
+  response.writeHead(status, {
+    'Content-Type': contentType,
+    'Cache-Control': 'no-store',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-App-Token',
+    ...headers
+  });
+  response.end(body);
+}
+
+function parseImageDataUrl(imageDataUrl) {
+  if (
+    typeof imageDataUrl !== 'string' ||
+    !/^data:image\\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=]+$/.test(imageDataUrl)
+  ) {
+    const error = new Error('Upload a PNG, JPG, or WEBP image.');
+    error.status = 400;
+    throw error;
+  }
+  return Buffer.from(imageDataUrl.slice(imageDataUrl.indexOf(',') + 1), 'base64');
 }
 
 function tokenMatches(provided, expected) {
@@ -184,7 +209,11 @@ const server = createServer(async (request, response) => {
     return;
   }
 
-  if (request.method !== 'POST' || url.pathname !== '/api/prepare-avatar') {
+  const supportedRoutes = new Set([
+    '/api/prepare-avatar',
+    '/api/export-8k'
+  ]);
+  if (request.method !== 'POST' || !supportedRoutes.has(url.pathname)) {
     sendJson(response, 404, { error: 'Route not found.' });
     return;
   }
@@ -197,27 +226,56 @@ const server = createServer(async (request, response) => {
 
   const ip = request.headers['x-forwarded-for']?.split(',')[0]?.trim() || request.socket.remoteAddress || 'unknown';
   if (!allowedByRateLimit(ip)) {
-    sendJson(response, 429, { error: 'Too many image-analysis requests. Please try again later.' });
+    sendJson(response, 429, { error: 'Too many image-processing requests. Please try again later.' });
     return;
   }
 
   try {
     const body = await readJson(request);
-    const imageDataUrl = body.imageDataUrl;
-    if (
-      typeof imageDataUrl !== 'string' ||
-      !/^data:image\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=]+$/.test(imageDataUrl)
-    ) {
-      sendJson(response, 400, { error: 'Upload a PNG, JPG, or WEBP image.' });
+    const imageBuffer = parseImageDataUrl(body.imageDataUrl);
+
+    if (url.pathname === '/api/export-8k') {
+      const metadata = await sharp(imageBuffer, { limitInputPixels: 40_000_000 }).metadata();
+      if (!metadata.width || !metadata.height) {
+        const error = new Error('The selected image dimensions could not be read.');
+        error.status = 400;
+        throw error;
+      }
+
+      const portrait = metadata.height > metadata.width;
+      const targetWidth = portrait ? 4320 : 7680;
+      const targetHeight = portrait ? 7680 : 4320;
+      const output = await sharp(imageBuffer, { limitInputPixels: 40_000_000 })
+        .rotate()
+        .resize(targetWidth, targetHeight, {
+          fit: 'contain',
+          background: { r: 0, g: 0, b: 0, alpha: 0 },
+          kernel: 'lanczos3',
+          withoutEnlargement: false,
+          fastShrinkOnLoad: false
+        })
+        .webp({
+          quality: 94,
+          alphaQuality: 100,
+          effort: 5,
+          smartSubsample: true
+        })
+        .toBuffer({ resolveWithObject: true });
+
+      sendBinary(response, 200, output.data, 'image/webp', {
+        'X-Output-Width': String(output.info.width),
+        'X-Output-Height': String(output.info.height),
+        'X-Output-Resolution': '8K-upscaled'
+      });
       return;
     }
 
-    const result = await prepareAvatar(imageDataUrl);
+    const result = await prepareAvatar(body.imageDataUrl);
     sendJson(response, 200, { success: true, ...result });
   } catch (error) {
     const status = Number.isInteger(error.status) ? error.status : 502;
     console.error('PerfectMotion AI request failed:', error.message);
-    sendJson(response, status, { error: error.message || 'Image preparation failed.' });
+    sendJson(response, status, { error: error.message || 'Image processing failed.' });
   }
 });
 
