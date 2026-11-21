@@ -41,7 +41,7 @@ function sendBinary(response, status, body, contentType, headers = {}) {
 function parseImageDataUrl(imageDataUrl) {
   if (
     typeof imageDataUrl !== 'string' ||
-    !/^data:image\\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=]+$/.test(imageDataUrl)
+    !/^data:image\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=]+$/.test(imageDataUrl)
   ) {
     const error = new Error('Upload a PNG, JPG, or WEBP image.');
     error.status = 400;
