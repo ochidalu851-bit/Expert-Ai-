@@ -36,6 +36,73 @@ class AvatarMeshView(context: Context) : View(context) {
         invalidate()
     }
 
+    fun renderFullResolutionFrame(): Bitmap? {
+        val image = bitmap ?: return null
+        val output = Bitmap.createBitmap(
+            image.width,
+            image.height,
+            Bitmap.Config.ARGB_8888
+        )
+        val canvas = Canvas(output)
+        val bounds = RectF(0f, 0f, image.width.toFloat(), image.height.toFloat())
+
+        val usableJoints = sourcePose.keys
+            .intersect(livePose.keys)
+            .filter { it in BodyJoints.names }
+
+        if (usableJoints.size < 5) {
+            canvas.drawBitmap(image, null, bounds, paint)
+            return output
+        }
+
+        val exportVertices = FloatArray((meshColumns + 1) * (meshRows + 1) * 2)
+        val radius = 0.17f
+        var index = 0
+        for (row in 0..meshRows) {
+            val v = row.toFloat() / meshRows
+            for (column in 0..meshColumns) {
+                val u = column.toFloat() / meshColumns
+                var displacementX = 0f
+                var displacementY = 0f
+                var totalWeight = 0f
+
+                usableJoints.forEach { name ->
+                    val source = sourcePose[name] ?: return@forEach
+                    val target = livePose[name] ?: return@forEach
+                    val dx = target.x - source.x
+                    val dy = target.y - source.y
+                    val distanceSquared =
+                        (u - source.x) * (u - source.x) +
+                        (v - source.y) * (v - source.y)
+                    val weight = exp(-distanceSquared / (2f * radius * radius))
+                    displacementX += dx * weight
+                    displacementY += dy * weight
+                    totalWeight += weight
+                }
+
+                if (totalWeight > 0.0001f) {
+                    displacementX /= totalWeight
+                    displacementY /= totalWeight
+                }
+
+                exportVertices[index++] = bounds.left + (u + displacementX) * image.width
+                exportVertices[index++] = bounds.top + (v + displacementY) * image.height
+            }
+        }
+
+        canvas.drawBitmapMesh(
+            image,
+            meshColumns,
+            meshRows,
+            exportVertices,
+            0,
+            null,
+            0,
+            paint
+        )
+        return output
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val image = bitmap ?: return
