@@ -32,13 +32,11 @@ import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -59,7 +57,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -291,7 +288,7 @@ private fun PerfectMotionHome() {
                                     verticalArrangement = Arrangement.Center
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Outlined.Upload,
+                                        imageVector = Icons.Outlined.Image,
                                         contentDescription = null,
                                         tint = Accent,
                                         modifier = Modifier.size(32.dp)
@@ -376,7 +373,7 @@ private fun PerfectMotionHome() {
                     contentColor = Midnight
                 )
             ) {
-                Icon(Icons.Outlined.Upload, contentDescription = null)
+                Icon(Icons.Outlined.Image, contentDescription = null)
                 Spacer(Modifier.size(8.dp))
                 Text(
                     if (uploadedImage == null) "UPLOAD IMAGE & OPEN CAMERA" else "CHANGE IMAGE",
