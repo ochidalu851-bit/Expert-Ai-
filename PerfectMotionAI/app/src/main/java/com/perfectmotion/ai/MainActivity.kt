@@ -52,6 +52,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,6 +67,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 
 class MainActivity : ComponentActivity() {
@@ -108,6 +110,10 @@ private fun PerfectMotionHome() {
     }
 
     var uploadedImage by remember { mutableStateOf<Bitmap?>(null) }
+    var avatarView by remember { mutableStateOf<AvatarMeshView?>(null) }
+    var isExporting by remember { mutableStateOf(false) }
+    var pendingExportBytes by remember { mutableStateOf<ByteArray?>(null) }
+    val coroutineScope = rememberCoroutineScope()
     var cameraAllowed by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -142,6 +148,26 @@ private fun PerfectMotionHome() {
         } else {
             "Camera permission is needed to mirror your movement."
         }
+    }
+
+    val exportFilePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("image/webp")
+    ) { uri ->
+        val bytes = pendingExportBytes
+        if (uri != null && bytes != null) {
+            runCatching {
+                context.contentResolver.openOutputStream(uri)?.use { output ->
+                    output.write(bytes)
+                } ?: error("Could not open the selected save location.")
+            }.onSuccess {
+                status = "8K upscaled frame saved successfully."
+            }.onFailure { error ->
+                status = "Could not save export: ${error.message ?: "storage error"}"
+            }
+        } else if (uri == null) {
+            status = "8K export cancelled."
+        }
+        pendingExportBytes = null
     }
 
     val imagePicker = rememberLauncherForActivityResult(
@@ -290,10 +316,13 @@ private fun PerfectMotionHome() {
                         ) {
                             if (uploadedImage != null) {
                                 AndroidView(
-                                    factory = { AvatarMeshView(it) },
+                                    factory = { viewContext ->
+                                        AvatarMeshView(viewContext).also { avatarView = it }
+                                    },
                                     modifier = Modifier.fillMaxSize(),
                                     update = {
                                         it.setFrame(uploadedImage, referencePose, livePose)
+                                        avatarView = it
                                     }
                                 )
                             } else {
@@ -394,6 +423,52 @@ private fun PerfectMotionHome() {
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.5.sp
                 )
+            }
+
+            if (uploadedImage != null) {
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = {
+                        val frame = avatarView?.renderFullResolutionFrame()
+                        when {
+                            frame == null -> status = "The motion frame is not ready yet."
+                            serverUrl.isBlank() || appToken.isBlank() -> {
+                                status = "Open Settings and add the AI server URL and app access token before exporting."
+                            }
+                            else -> {
+                                isExporting = true
+                                status = "Preparing the 8K upscaled frame…"
+                                coroutineScope.launch {
+                                    try {
+                                        val bytes = withContext(Dispatchers.IO) {
+                                            MotionAiClient.export8kFrame(
+                                                image = frame,
+                                                baseUrl = serverUrl,
+                                                appToken = appToken
+                                            )
+                                        }
+                                        pendingExportBytes = bytes
+                                        status = "Choose where to save your 8K upscaled frame."
+                                        exportFilePicker.launch("PerfectMotionAI-8K.webp")
+                                    } catch (error: Exception) {
+                                        status = "8K export failed: ${error.message ?: "check the AI server"}"
+                                    } finally {
+                                        isExporting = false
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    enabled = !isExporting && referencePose.size >= 5,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(15.dp)
+                ) {
+                    Text(
+                        if (isExporting) "PREPARING 8K EXPORT…" else "EXPORT CURRENT FRAME · 8K UPSCALED",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    )
+                }
             }
 
             Spacer(Modifier.height(12.dp))
