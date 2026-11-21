@@ -29,6 +29,15 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check AI server syntax
+        working-directory: PerfectMotionAI/server
+        run: npm run check
+
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
