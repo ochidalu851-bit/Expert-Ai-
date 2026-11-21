@@ -11,7 +11,7 @@ PerfectMotion AI is an Android app for live camera-driven 2D movement mirroring.
 - The live camera landmarks are used immediately to deform a 2D mesh of the uploaded photo.
 - ML Kit selfie segmentation attempts to isolate the person before animation.
 - The user can export the current rendered still frame as an 8K-sized WebP.
-- The launcher graphic is included in `app/src/main/res/mipmap-anydpi/ic_launcher.xml`.
+- The launcher icon uses the uploaded PerfectMotion AI runner/8K artwork in `app/src/main/res/drawable-nodpi/ic_launcher.jpg`.
 
 Minimum Android version: Android 7.0 (API 24).
 
