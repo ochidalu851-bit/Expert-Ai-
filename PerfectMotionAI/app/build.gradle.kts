@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.perfectmotion.ai"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.perfectmotion.ai"
