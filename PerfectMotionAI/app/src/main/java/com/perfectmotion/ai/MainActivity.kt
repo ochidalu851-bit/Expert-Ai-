@@ -159,7 +159,7 @@ private fun PerfectMotionHome() {
             ) == PackageManager.PERMISSION_GRANTED
         )
     }
-    var status by remember { mutableStateOf("Upload a full-body photo to start motion mirroring.") }
+    var status by remember { mutableStateOf("Upload a clear photo with the head, shoulders and arms visible.") }
     var isPreparing by remember { mutableStateOf(false) }
     var isSegmenting by remember { mutableStateOf(false) }
     var isCreatingVoice by remember { mutableStateOf(false) }
@@ -267,10 +267,10 @@ private fun PerfectMotionHome() {
                 PhotoPoseAnalyzer.detect(source)
             }
             referencePose = joints
-            status = if (joints.size >= 5) {
+            status = if (joints.size >= 3) {
                 "Photo rig ready. Stand in view and move to animate it."
             } else {
-                "Could not find enough body joints. Try a clear, front-facing full-body photo."
+                "Could not find enough body joints. Try a clear photo with the head and shoulders visible."
             }
         } catch (error: Exception) {
             status = "Photo pose detection failed: ${error.message ?: "try another clear photo"}"
@@ -420,7 +420,7 @@ private fun PerfectMotionHome() {
                             modifier = Modifier.fillMaxSize(),
                             onPose = { pose ->
                                 livePose = pose
-                                if (baselineLivePose.size < 5 && pose.size >= 5) {
+                                if (baselineLivePose.size < 3 && pose.size >= 3) {
                                     baselineLivePose = pose.toMap()
                                     status = "Motion linked. Your photo now follows your movement."
                                 }
@@ -454,8 +454,8 @@ private fun PerfectMotionHome() {
                     Text(
                         when {
                             isPreparing -> "PREPARING PHOTO RIG"
-                            referencePose.size < 5 -> "PHOTO RIG NOT READY"
-                            livePose.size >= 5 && baselineLivePose.size >= 5 -> "LIVE 2.5D MOTION"
+                            referencePose.size < 3 -> "PHOTO RIG NOT READY"
+                            livePose.size >= 3 && baselineLivePose.size >= 3 -> "LIVE 2.5D MOTION"
                             else -> "CAMERA: FINDING BODY"
                         },
                         modifier = Modifier
@@ -463,7 +463,7 @@ private fun PerfectMotionHome() {
                             .clip(RoundedCornerShape(18.dp))
                             .background(Color(0xCC080F25))
                             .padding(horizontal = 14.dp, vertical = 12.dp),
-                        color = if (referencePose.size >= 5 && livePose.size >= 5) Accent else Color.White,
+                        color = if (referencePose.size >= 3 && livePose.size >= 3) Accent else Color.White,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.8.sp,

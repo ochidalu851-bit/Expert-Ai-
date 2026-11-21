@@ -65,7 +65,7 @@ class AvatarMeshView(context: Context) : View(context) {
         )
 
         val pairs = jointPairs()
-        if (pairs.size < 5) {
+        if (pairs.size < 3) {
             canvas.drawBitmap(image, null, imageRect, paint)
             return
         }
