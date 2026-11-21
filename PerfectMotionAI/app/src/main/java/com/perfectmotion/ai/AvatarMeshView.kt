@@ -85,20 +85,78 @@ class AvatarMeshView(context: Context) : View(context) {
         canvas.restore()
     }
 
+    /**
+     * Retargets each camera bone's CHANGE IN ANGLE onto the matching photo bone.
+     * This preserves the uploaded person's limb lengths and proportions instead of
+     * copying the camera user's raw pixel coordinates onto a differently posed photo.
+     * Shared joints average their adjacent-bone solutions for smoother articulation.
+     */
     private fun jointMotions(): Map<String, JointMotion> {
+        val candidates = linkedMapOf<String, MutableList<Point2>>()
+
+        BodyJoints.bones.forEach { (startName, endName) ->
+            val sourceA = sourcePose[startName] ?: return@forEach
+            val sourceB = sourcePose[endName] ?: return@forEach
+            val baseA = baselinePose[startName] ?: return@forEach
+            val baseB = baselinePose[endName] ?: return@forEach
+            val liveA = livePose[startName] ?: return@forEach
+            val liveB = livePose[endName] ?: return@forEach
+
+            val baseAngle = angle(baseA, baseB)
+            val liveAngle = angle(liveA, liveB)
+            val delta = Math.toRadians(wrapAngle(liveAngle - baseAngle).toDouble())
+            val baseLength = distance(baseA, baseB)
+            val liveLength = distance(liveA, liveB)
+            val lengthScale = if (baseLength > 0.015f && liveLength > 0.005f) {
+                (liveLength / baseLength).coerceIn(0.72f, 1.38f)
+            } else 1f
+
+            val midX = (sourceA.x + sourceB.x) / 2f
+            val midY = (sourceA.y + sourceB.y) / 2f
+            val cos = kotlin.math.cos(delta).toFloat()
+            val sin = kotlin.math.sin(delta).toFloat()
+
+            listOf(startName to sourceA, endName to sourceB).forEach { (name, point) ->
+                val x = (point.x - midX) * lengthScale
+                val y = (point.y - midY) * lengthScale
+                val target = Point2(
+                    x = (midX + x * cos - y * sin).coerceIn(-0.25f, 1.25f),
+                    y = (midY + x * sin + y * cos).coerceIn(-0.25f, 1.25f),
+                    z = point.z + (((liveA.z + liveB.z) - (baseA.z + baseB.z)) * 0.5f),
+                    world = livePose[name]?.world,
+                    visibility = minOf(liveA.visibility, liveB.visibility)
+                )
+                candidates.getOrPut(name) { mutableListOf() }.add(target)
+            }
+        }
+
         val result = linkedMapOf<String, JointMotion>()
         BodyJoints.names.forEach { name ->
             val source = sourcePose[name] ?: return@forEach
-            val baseline = baselinePose[name] ?: return@forEach
-            val current = livePose[name] ?: return@forEach
-            val target = Point2(
-                x = (source.x + (current.x - baseline.x) * 1.55f).coerceIn(-0.25f, 1.25f),
-                y = (source.y + (current.y - baseline.y) * 1.55f).coerceIn(-0.25f, 1.25f),
-                z = source.z + (current.z - baseline.z) * 1.35f,
-                world = current.world,
-                visibility = current.visibility
-            )
-            result[name] = JointMotion(source, target)
+            val options = candidates[name]
+            if (options.isNullOrEmpty()) {
+                val baseline = baselinePose[name] ?: return@forEach
+                val current = livePose[name] ?: return@forEach
+                result[name] = JointMotion(
+                    source,
+                    Point2(
+                        x = (source.x + (current.x - baseline.x) * 1.25f).coerceIn(-0.25f, 1.25f),
+                        y = (source.y + (current.y - baseline.y) * 1.25f).coerceIn(-0.25f, 1.25f),
+                        z = source.z + (current.z - baseline.z),
+                        world = current.world,
+                        visibility = current.visibility
+                    )
+                )
+            } else {
+                val target = Point2(
+                    x = options.map { it.x }.average().toFloat(),
+                    y = options.map { it.y }.average().toFloat(),
+                    z = options.map { it.z }.average().toFloat(),
+                    world = options.first().world,
+                    visibility = options.minOf { it.visibility }
+                )
+                result[name] = JointMotion(source, target)
+            }
         }
         return result
     }

@@ -13,6 +13,7 @@ import com.google.mediapipe.tasks.vision.core.ImageProcessingOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker
 import kotlin.math.abs
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * On-device, continuous 33-point pose tracking.
@@ -27,6 +28,7 @@ class PoseAnalyzer(
 ) : ImageAnalysis.Analyzer {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val lock = Any()
+    private val lastTimestamp = AtomicLong(0L)
     private var previousPose: Map<String, Point2> = emptyMap()
     @Volatile private var isClosed = false
 
@@ -75,10 +77,14 @@ class PoseAnalyzer(
                 .setRotationDegrees(imageProxy.imageInfo.rotationDegrees)
                 .build()
 
+            val now = SystemClock.uptimeMillis()
+            val timestamp = lastTimestamp.updateAndGet { previous ->
+                maxOf(now, previous + 1L)
+            }
             landmarker.detectAsync(
                 mpImage,
                 processingOptions,
-                SystemClock.uptimeMillis()
+                timestamp
             )
         } catch (error: Exception) {
             Log.w("PerfectMotionAI", "Could not submit camera frame to MediaPipe", error)

@@ -150,6 +150,7 @@ private fun PerfectMotionHome() {
     var backgroundImage by remember { mutableStateOf<Bitmap?>(null) }
     var livePose by remember { mutableStateOf<Map<String, Point2>>(emptyMap()) }
     var baselineLivePose by remember { mutableStateOf<Map<String, Point2>>(emptyMap()) }
+    var calibrationFrames by remember { mutableStateOf<List<Map<String, Point2>>>(emptyList()) }
     var referencePose by remember { mutableStateOf<Map<String, Point2>>(emptyMap()) }
     var referenceSourceImage by remember { mutableStateOf<Bitmap?>(null) }
     var cameraAllowed by remember {
@@ -207,6 +208,7 @@ private fun PerfectMotionHome() {
                 referencePose = emptyMap()
                 livePose = emptyMap()
                 baselineLivePose = emptyMap()
+                calibrationFrames = emptyList()
                 isSegmenting = true
                 status = "Separating the person from the background…"
 
@@ -426,9 +428,23 @@ private fun PerfectMotionHome() {
                             modifier = Modifier.fillMaxSize(),
                             onPose = { pose ->
                                 livePose = pose
-                                if (baselineLivePose.size < 3 && pose.size >= 3) {
-                                    baselineLivePose = pose.toMap()
-                                    status = "Motion linked. The person moves while the background stays fixed."
+                                if (baselineLivePose.isEmpty() && pose.size >= 8) {
+                                    val samples = (calibrationFrames + listOf(pose)).takeLast(12)
+                                    calibrationFrames = samples
+                                    if (samples.size >= 8) {
+                                        val stableNames = samples.map { it.keys }.reduce { a, b -> a intersect b }
+                                        baselineLivePose = stableNames.associateWith { name ->
+                                            val points = samples.mapNotNull { it[name] }
+                                            Point2(
+                                                x = points.map { it.x }.average().toFloat(),
+                                                y = points.map { it.y }.average().toFloat(),
+                                                z = points.map { it.z }.average().toFloat(),
+                                                world = points.lastOrNull()?.world,
+                                                visibility = points.map { it.visibility }.average().toFloat()
+                                            )
+                                        }
+                                        status = "Motion calibrated. Move naturally to animate the uploaded person."
+                                    }
                                 }
                             }
                         )
