@@ -107,7 +107,7 @@ private fun PerfectMotionTheme(content: @Composable () -> Unit) {
 private fun PerfectMotionHome() {
     val context = LocalContext.current
     val preferences = remember {
-        context.getSharedPreferences("perfect_motion_settings", MODE_PRIVATE)
+        context.getSharedPreferences("perfect_motion_settings", android.content.Context.MODE_PRIVATE)
     }
 
     var uploadedImage by remember { mutableStateOf<Bitmap?>(null) }
@@ -518,7 +518,8 @@ private fun CameraMirrorPane(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val latestOnPose by rememberUpdatedState(onPose)
+    val latestOnPose = rememberUpdatedState(onPose)
+    var overlayPose by remember { mutableStateOf<Map<String, Point2>>(emptyMap()) }
     val previewView = remember(context) {
         PreviewView(context).apply {
             scaleType = PreviewView.ScaleType.FIT_CENTER
@@ -527,7 +528,10 @@ private fun CameraMirrorPane(
     }
     val executor = remember { Executors.newSingleThreadExecutor() }
     val analyzer = remember {
-        PoseAnalyzer { points -> latestOnPose(points) }
+        PoseAnalyzer { points ->
+            overlayPose = points
+            latestOnPose.value(points)
+        }
     }
 
     DisposableEffect(lifecycleOwner, previewView) {
@@ -574,10 +578,11 @@ private fun CameraMirrorPane(
             factory = { previewView },
             modifier = Modifier.fillMaxSize()
         )
+        val currentPose = overlayPose
         Canvas(Modifier.fillMaxSize()) {
             BodyJoints.bones.forEach { (startName, endName) ->
-                val start = latestPosePoint(startName)
-                val end = latestPosePoint(endName)
+                val start = currentPose[startName]
+                val end = currentPose[endName]
                 if (start != null && end != null) {
                     drawLine(
                         color = Accent.copy(alpha = 0.85f),
@@ -593,11 +598,16 @@ private fun CameraMirrorPane(
                     )
                 }
             }
+            currentPose.values.forEach { point ->
+                drawCircle(
+                    color = Accent,
+                    radius = 3.5f,
+                    center = androidx.compose.ui.geometry.Offset(
+                        point.x * size.width,
+                        point.y * size.height
+                    )
+                )
+            }
         }
     }
-}
-
-@Composable
-private fun latestPosePoint(name: String): Point2? {
-    return null
 }
