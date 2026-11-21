@@ -62,7 +62,7 @@ class PoseAnalyzer(
                     val landmark = pose.getPoseLandmark(type)
                     if (landmark != null && landmark.inFrameLikelihood >= 0.35f) {
                         val rawX = (landmark.position.x / uprightWidth).coerceIn(0f, 1f)
-                        val x = 1f - rawX
+                        val x = rawX
                         val y = (landmark.position.y / uprightHeight).coerceIn(0f, 1f)
                         points[name] = Point2(x, y)
                     }

@@ -38,7 +38,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
@@ -148,9 +147,10 @@ private fun PerfectMotionHome() {
     val scope = rememberCoroutineScope()
 
     var uploadedImage by remember { mutableStateOf<Bitmap?>(null) }
-    var avatarView by remember { mutableStateOf<AvatarMeshView?>(null) }
     var livePose by remember { mutableStateOf<Map<String, Point2>>(emptyMap()) }
+    var baselineLivePose by remember { mutableStateOf<Map<String, Point2>>(emptyMap()) }
     var referencePose by remember { mutableStateOf<Map<String, Point2>>(emptyMap()) }
+    var referenceSourceImage by remember { mutableStateOf<Bitmap?>(null) }
     var cameraAllowed by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -162,9 +162,7 @@ private fun PerfectMotionHome() {
     var status by remember { mutableStateOf("Upload a full-body photo to start motion mirroring.") }
     var isPreparing by remember { mutableStateOf(false) }
     var isSegmenting by remember { mutableStateOf(false) }
-    var isExporting by remember { mutableStateOf(false) }
     var isCreatingVoice by remember { mutableStateOf(false) }
-    var pendingExportBytes by remember { mutableStateOf<ByteArray?>(null) }
     var showVoiceDialog by remember { mutableStateOf(false) }
     var voiceName by remember {
         mutableStateOf(preferences.getString("voice_name", "My voice") ?: "My voice")
@@ -189,26 +187,6 @@ private fun PerfectMotionHome() {
         }
     }
 
-    val exportFilePicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("image/webp")
-    ) { uri ->
-        val bytes = pendingExportBytes
-        if (uri != null && bytes != null) {
-            runCatching {
-                context.contentResolver.openOutputStream(uri)?.use { output ->
-                    output.write(bytes)
-                } ?: error("Could not open the selected save location.")
-            }.onSuccess {
-                status = "8K upscaled image saved."
-            }.onFailure { error ->
-                status = "Export could not be saved: ${error.message ?: "storage error"}"
-            }
-        } else if (uri == null) {
-            status = "Export cancelled."
-        }
-        pendingExportBytes = null
-    }
-
     val imagePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
@@ -223,8 +201,10 @@ private fun PerfectMotionHome() {
                 status = "The selected image could not be opened."
             } else {
                 uploadedImage = decoded
+                referenceSourceImage = decoded
                 referencePose = emptyMap()
                 livePose = emptyMap()
+                baselineLivePose = emptyMap()
                 isSegmenting = true
                 status = "Isolating the person in your photo…"
 
@@ -278,24 +258,22 @@ private fun PerfectMotionHome() {
         }
     }
 
-    LaunchedEffect(uploadedImage, isSegmenting) {
-        val image = uploadedImage ?: return@LaunchedEffect
-        if (isSegmenting) return@LaunchedEffect
-
+    LaunchedEffect(referenceSourceImage) {
+        val source = referenceSourceImage ?: return@LaunchedEffect
         isPreparing = true
-        status = "AI is locating body joints in your uploaded image…"
+        status = "Finding body joints on this phone…"
         try {
-            val joints = withContext(Dispatchers.IO) {
-                MotionAiClient.prepareAvatar(image)
+            val joints = withContext(Dispatchers.Default) {
+                PhotoPoseAnalyzer.detect(source)
             }
             referencePose = joints
             status = if (joints.size >= 5) {
-                "Ready. Move in front of the small camera preview."
+                "Photo rig ready. Stand in view and move to animate it."
             } else {
-                "Not enough body landmarks were found. Try a clear, full-body photo."
+                "Could not find enough body joints. Try a clear, front-facing full-body photo."
             }
         } catch (error: Exception) {
-            status = "Image preparation failed: ${error.message ?: "check your connection"}"
+            status = "Photo pose detection failed: ${error.message ?: "try another clear photo"}"
         } finally {
             isPreparing = false
         }
@@ -309,13 +287,15 @@ private fun PerfectMotionHome() {
         ) {
             if (uploadedImage != null) {
                 AndroidView(
-                    factory = { viewContext ->
-                        AvatarMeshView(viewContext).also { avatarView = it }
-                    },
+                    factory = { viewContext -> AvatarMeshView(viewContext) },
                     modifier = Modifier.fillMaxSize(),
                     update = { view ->
-                        view.setFrame(uploadedImage, referencePose, livePose)
-                        avatarView = view
+                        view.setFrame(
+                            uploadedImage,
+                            referencePose,
+                            livePose,
+                            baselineLivePose
+                        )
                     }
                 )
             } else {
@@ -438,7 +418,13 @@ private fun PerfectMotionHome() {
                         )
                         else -> CameraMirrorPane(
                             modifier = Modifier.fillMaxSize(),
-                            onPose = { livePose = it }
+                            onPose = { pose ->
+                                livePose = pose
+                                if (baselineLivePose.size < 5 && pose.size >= 5) {
+                                    baselineLivePose = pose.toMap()
+                                    status = "Motion linked. Your photo now follows your movement."
+                                }
+                            }
                         )
                     }
                     Text(
@@ -456,117 +442,53 @@ private fun PerfectMotionHome() {
                 }
             }
 
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 14.dp)
-            ) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    color = Panel,
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        Color.White.copy(alpha = 0.10f)
-                    )
+            if (uploadedImage != null) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 22.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+                    Text(
+                        when {
+                            isPreparing -> "PREPARING PHOTO RIG"
+                            referencePose.size < 5 -> "PHOTO RIG NOT READY"
+                            livePose.size >= 5 && baselineLivePose.size >= 5 -> "LIVE 2.5D MOTION"
+                            else -> "CAMERA: FINDING BODY"
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(Color(0xCC080F25))
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        color = if (referencePose.size >= 5 && livePose.size >= 5) Accent else Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp,
+                        maxLines = 1
+                    )
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xE6101630),
+                        border = androidx.compose.foundation.BorderStroke(1.5.dp, Accent)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (livePose.isNotEmpty()) Color(0xFF48E59A)
-                                        else if (isPreparing) Color(0xFFFFC857)
-                                        else Muted
-                                    )
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                when {
-                                    isPreparing -> "PREPARING IMAGE"
-                                    livePose.isNotEmpty() && referencePose.size >= 5 -> "LIVE TRACKING"
-                                    referencePose.size >= 5 -> "READY FOR MOVEMENT"
-                                    else -> "MOTION STATUS"
-                                },
-                                color = Accent,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
-                            )
-                            Spacer(Modifier.weight(1f))
-                            if (savedVoiceId.isNotBlank()) {
-                                Text(
-                                    "VOICE SAVED",
-                                    color = Color(0xFF8DEAB5),
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            status,
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            lineHeight = 15.sp,
-                            maxLines = 2
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            verticalAlignment = Alignment.CenterVertically
+                        IconButton(
+                            onClick = {
+                                voiceError = ""
+                                consentAudio = null
+                                sampleAudio = null
+                                ownerConsent = false
+                                showVoiceDialog = true
+                            },
+                            modifier = Modifier.size(54.dp)
                         ) {
-                            ActionButton(
-                                icon = Icons.Filled.Image,
-                                label = "PHOTO",
-                                onClick = { imagePicker.launch("image/*") }
-                            )
-                            ActionButton(
-                                icon = Icons.Filled.Mic,
-                                label = if (savedVoiceId.isBlank()) "UPLOAD VOICE" else "MY VOICE",
-                                onClick = {
-                                    voiceError = ""
-                                    consentAudio = null
-                                    sampleAudio = null
-                                    ownerConsent = false
-                                    showVoiceDialog = true
-                                },
-                                highlighted = true
-                            )
-                            ActionButton(
-                                icon = Icons.Filled.Download,
-                                label = "8K EXPORT",
-                                onClick = {
-                                    val frame = avatarView?.renderFullResolutionFrame()
-                                    if (frame == null) {
-                                        status = "The motion frame is not ready yet."
-                                    } else if (referencePose.size < 5) {
-                                        status = "Wait until the image motion rig is ready."
-                                    } else {
-                                        isExporting = true
-                                        status = "Preparing the current frame for 8K export…"
-                                        scope.launch {
-                                            try {
-                                                val bytes = withContext(Dispatchers.IO) {
-                                                    MotionAiClient.export8kFrame(frame)
-                                                }
-                                                pendingExportBytes = bytes
-                                                exportFilePicker.launch("PerfectMotionAI-8K.webp")
-                                            } catch (error: Exception) {
-                                                status = "8K export failed: ${error.message ?: "server error"}"
-                                            } finally {
-                                                isExporting = false
-                                            }
-                                        }
-                                    }
-                                },
-                                enabled = !isExporting && referencePose.size >= 5
+                            Icon(
+                                Icons.Filled.Mic,
+                                contentDescription = if (savedVoiceId.isBlank()) "Upload voice" else "My voice",
+                                tint = Accent,
+                                modifier = Modifier.size(25.dp)
                             )
                         }
                     }
@@ -759,51 +681,6 @@ private fun PerfectMotionHome() {
     }
 }
 
-@Composable
-private fun ActionButton(
-    icon: ImageVector,
-    label: String,
-    onClick: () -> Unit,
-    highlighted: Boolean = false,
-    enabled: Boolean = true
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        IconButton(
-            onClick = onClick,
-            enabled = enabled,
-            modifier = Modifier
-                .size(52.dp)
-                .clip(CircleShape)
-                .background(
-                    if (highlighted) Accent.copy(alpha = 0.18f)
-                    else Color.White.copy(alpha = 0.08f)
-                )
-                .border(
-                    1.dp,
-                    if (highlighted) Accent else Color.White.copy(alpha = 0.18f),
-                    CircleShape
-                )
-        ) {
-            Icon(
-                icon,
-                contentDescription = label,
-                tint = if (highlighted) Accent else Color.White,
-                modifier = Modifier.size(23.dp)
-            )
-        }
-        Spacer(Modifier.height(4.dp))
-        Text(
-            label,
-            color = if (enabled) Color.White else Muted,
-            fontSize = 8.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 0.3.sp
-        )
-    }
-}
-
 private fun readAudioUpload(context: Context, uri: Uri): AudioUpload? {
     val mime = context.contentResolver.getType(uri)
         ?.substringBefore(";")
@@ -939,11 +816,11 @@ private fun CameraMirrorPane(
                     drawLine(
                         color = Accent.copy(alpha = 0.82f),
                         start = androidx.compose.ui.geometry.Offset(
-                            start.x * size.width,
+                            (1f - start.x) * size.width,
                             start.y * size.height
                         ),
                         end = androidx.compose.ui.geometry.Offset(
-                            end.x * size.width,
+                            (1f - end.x) * size.width,
                             end.y * size.height
                         ),
                         strokeWidth = 2f
@@ -955,7 +832,7 @@ private fun CameraMirrorPane(
                     color = Accent,
                     radius = 3f,
                     center = androidx.compose.ui.geometry.Offset(
-                        point.x * size.width,
+                        (1f - point.x) * size.width,
                         point.y * size.height
                     )
                 )

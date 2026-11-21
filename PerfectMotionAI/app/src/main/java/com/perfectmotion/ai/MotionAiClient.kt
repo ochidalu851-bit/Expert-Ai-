@@ -1,9 +1,7 @@
 package com.perfectmotion.ai
 
-import android.graphics.Bitmap
 import android.util.Base64
 import org.json.JSONObject
-import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -17,59 +15,6 @@ data class AudioUpload(
 object MotionAiClient {
     private val baseUrl: String
         get() = BuildConfig.DEFAULT_AI_SERVER_URL.trimEnd('/')
-
-    fun prepareAvatar(image: Bitmap): Map<String, Point2> {
-        val response = postJson(
-            "/api/prepare-avatar",
-            JSONObject().put("imageDataUrl", imageDataUrl(image))
-        )
-        if (!response.optBoolean("success", false)) {
-            throw IOException(response.optString("error", "Image analysis failed."))
-        }
-        val joints = response.optJSONObject("referencePose")
-            ?: throw IOException("The AI server did not return body landmarks.")
-        val result = linkedMapOf<String, Point2>()
-        BodyJoints.names.forEach { name ->
-            val point = joints.optJSONObject(name) ?: return@forEach
-            val x = point.optDouble("x", Double.NaN)
-            val y = point.optDouble("y", Double.NaN)
-            if (x.isFinite() && y.isFinite()) {
-                result[name] = Point2(
-                    x.toFloat().coerceIn(0f, 1f),
-                    y.toFloat().coerceIn(0f, 1f)
-                )
-            }
-        }
-        if (result.size < 5) {
-            throw IOException("Not enough body landmarks were found. Try a full-body photo.")
-        }
-        return result
-    }
-
-    fun export8kFrame(image: Bitmap): ByteArray {
-        val connection = (URL("$baseUrl/api/export-8k").openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = 15_000
-            readTimeout = 120_000
-            doOutput = true
-            setRequestProperty("Content-Type", "application/json")
-            setRequestProperty("Accept", "image/webp")
-        }
-        return try {
-            val body = JSONObject()
-                .put("imageDataUrl", imageDataUrl(image))
-                .toString()
-                .toByteArray(Charsets.UTF_8)
-            connection.outputStream.use { it.write(body) }
-            val status = connection.responseCode
-            if (status !in 200..299) {
-                throw IOException(readError(connection))
-            }
-            connection.inputStream.use { it.readBytes() }
-        } finally {
-            connection.disconnect()
-        }
-    }
 
     fun createVoiceConsent(
         name: String,
@@ -161,14 +106,6 @@ object MotionAiClient {
         val message = runCatching { JSONObject(response).optString("error") }.getOrNull()
         return message?.takeIf { it.isNotBlank() }
             ?: "AI server request failed with HTTP ${connection.responseCode}."
-    }
-
-    private fun imageDataUrl(image: Bitmap): String {
-        val bytes = ByteArrayOutputStream().use { output ->
-            image.compress(Bitmap.CompressFormat.PNG, 100, output)
-            output.toByteArray()
-        }
-        return "data:image/png;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
     }
 
     private fun audioDataUrl(audio: AudioUpload): String {

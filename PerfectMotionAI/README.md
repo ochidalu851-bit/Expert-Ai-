@@ -1,59 +1,48 @@
 # PerfectMotion AI
 
-PerfectMotion AI is an Android app for live camera-driven 2D movement mirroring. The Android project is in this folder; the OpenAI-backed preparation and voice service is in `server/`.
+PerfectMotion AI is an Android camera-driven motion-mirroring app.
 
-## Android experience
+## Current motion flow
 
-- Choose a person photo from the phone.
-- The uploaded person fills the screen; the front-camera preview stays in a small floating window.
-- Android status and navigation bars are hidden during the motion experience to provide an immersive full-screen view.
-- CameraX streams front-camera frames and Google ML Kit estimates pose landmarks on-device.
-- The live camera landmarks are used immediately to deform a 2D mesh of the uploaded photo.
-- ML Kit selfie segmentation attempts to isolate the person before animation.
-- The user can export the current rendered still frame as an 8K-sized WebP.
-- The launcher icon uses the uploaded PerfectMotion AI runner/8K artwork in `app/src/main/res/drawable-nodpi/ic_launcher.jpg`.
+1. Select a photo from the phone.
+2. ML Kit detects the photo subject's body landmarks locally on the device. This photo-analysis step does not call OpenAI and does not consume OpenAI API credits.
+3. ML Kit selfie segmentation attempts to isolate the subject from the photo background.
+4. CameraX streams front-camera frames and ML Kit estimates live body landmarks locally.
+5. The first reliable camera pose becomes the user's neutral starting pose. Subsequent joint movement is transferred to matching joints in the uploaded image.
+6. A high-resolution 2D mesh, camera perspective projection, torso turn, lean and shoulder-span scaling create a depth-assisted 2.5D animation response.
 
-Minimum Android version: Android 7.0 (API 24).
+The uploaded photo remains the full-screen subject. The live camera stays in a small top-right preview. When a photo is loaded, the standalone Photo and 8K Export buttons are not shown; the bottom overlay contains only a compact motion state and the voice-upload control.
 
-## Custom voice upload
+## Motion accuracy and 3D limitations
 
-The app includes an upload flow for a user's preferred recorded voice. It asks for two recordings from the same adult speaker:
+This is live, on-device, depth-assisted **2.5D photo animation**, not a complete volumetric 3D human reconstruction. The camera tracks the person and transfers their relative body-joint movement to the uploaded photo in real time. Perspective rotation and depth-style scaling respond to turning and moving closer to or farther from the camera.
 
-1. A consent recording using the exact supported OpenAI consent sentence shown in the app.
-2. A 10–60 second voice sample with at least five seconds of speech and at least 15 spoken text tokens.
+A single flat image cannot reveal hidden limbs, a person's back, or unseen side surfaces. Those parts cannot be reconstructed reliably without a multi-view capture or a dedicated 3D reconstruction model and rig. The quality depends on visible joints in both the uploaded photo and the camera preview. For best results, upload a clear photo where the head, shoulders, arms and torso are visible, and frame the corresponding body parts inside the camera preview.
 
-Both files must be 10 MiB or smaller and use one of the supported audio MIME types. The app submits the recordings to the OpenAI custom-voice endpoints and lets the user preview a saved voice with a short generated speech sample.
+## Android requirements
 
-**Important limitations:**
-- Recording-based custom voice creation is restricted to OpenAI organisations that have been granted access. The upload will return an explanatory error when the project is not enabled.
-- The custom voice ID is currently saved in local app preferences on that device. This project does not yet have user accounts or cloud profile sync.
-- This is a voice-upload and speech-preview workflow; full duplex, real-time conversational voice calling is not implemented yet.
-- The speaker must own the voice or give explicit permission. Do not impersonate another person.
+- Minimum Android version: Android 7.0 (API 24).
+- Java 17.
+- CameraX live frame capture.
+- ML Kit Pose Detection for both reference photo and live camera.
+- ML Kit selfie segmentation for photo subject isolation.
 
-## OpenAI backend
+## Custom voice
 
-The live backend URL is fixed in the Android build configuration:
+The preferred-voice flow uploads a consent recording and a voice sample from the same adult speaker to OpenAI, when the API organisation has access to recording-based custom voices. It also supports generating a preview from the saved voice.
 
-`https://perfectmotion-ai-api-production.up.railway.app`
+This voice feature still uses the OpenAI backend and can require API credits and enabled custom-voice access. Voice IDs are currently stored on the local device; account-based voice sync and full duplex real-time voice conversation are not implemented.
 
-The OpenAI API key stays on Railway and is never included in the APK or exposed in the app Settings screen.
+## Backend
 
-Required Railway service variables:
+The Railway service is used by the custom-voice endpoints. The app no longer calls the backend to analyse uploaded photos, so motion setup remains available when the OpenAI project has no remaining credits.
 
-- `OPENAI_API_KEY`: the rotated OpenAI Platform project API key.
-- `OPENAI_VISION_MODEL`: optional; defaults to `gpt-6.2-astra`.
-- `PORT`: optional; defaults to `8080`.
-
-The Android app no longer exposes an AI server URL or app access-token field. The backend currently uses an IP-based request limit (20 requests per IP per hour) rather than per-user authentication. **This is not a complete production security boundary**; before releasing to a broad public audience, add sign-in and short-lived per-user server sessions.
+- Service: `perfectmotion-ai-api`
+- Base URL: `https://perfectmotion-ai-api-production.up.railway.app`
+- Keep `OPENAI_API_KEY` on Railway only; never embed it in the APK or commit it to GitHub.
 
 ## Build
 
 The GitHub Actions workflow at `.github/workflows/perfectmotion-ai-android.yml` builds a debug APK and publishes the artifact named `PerfectMotionAI-debug-apk`.
 
-The debug application ID is `com.perfectmotion.ai.debug`. The Android project is configured for Android API 24 or newer and uses Java 17.
-
-## Motion and export limits
-
-The live movement effect is a local, real-time **2D mesh warp** driven by estimated body landmarks. It is not a full 3D reconstruction or a generated motion-synthesis video. A single still photo cannot reveal hidden body parts or the back of a person, and the result depends on source-image quality and visible joints.
-
-The 8K export creates an 8K-sized canvas and upscales the current rendered frame. This is 8K upscaling, not native 8K detail recovery.
+The debug application ID is `com.perfectmotion.ai.debug`.
