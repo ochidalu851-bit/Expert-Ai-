@@ -147,6 +147,7 @@ private fun PerfectMotionHome() {
     val scope = rememberCoroutineScope()
 
     var uploadedImage by remember { mutableStateOf<Bitmap?>(null) }
+    var backgroundImage by remember { mutableStateOf<Bitmap?>(null) }
     var livePose by remember { mutableStateOf<Map<String, Point2>>(emptyMap()) }
     var baselineLivePose by remember { mutableStateOf<Map<String, Point2>>(emptyMap()) }
     var referencePose by remember { mutableStateOf<Map<String, Point2>>(emptyMap()) }
@@ -200,22 +201,26 @@ private fun PerfectMotionHome() {
             if (decoded == null) {
                 status = "The selected image could not be opened."
             } else {
-                uploadedImage = decoded
+                uploadedImage = null
+                backgroundImage = decoded
                 referenceSourceImage = decoded
                 referencePose = emptyMap()
                 livePose = emptyMap()
                 baselineLivePose = emptyMap()
                 isSegmenting = true
-                status = "Isolating the person in your photo…"
+                status = "Separating the person from the background…"
 
-                ImageSubjectSegmenter.cutOut(decoded) { cutout, _ ->
-                    uploadedImage = cutout ?: decoded
-                    isSegmenting = false
-                    status = if (cutout != null) {
-                        "Person isolated. Preparing the motion rig…"
+                ImageSubjectSegmenter.prepareLayers(decoded) { layers, _ ->
+                    if (layers != null) {
+                        backgroundImage = layers.background
+                        uploadedImage = layers.subject
+                        status = "Person separated. Background fixed. Preparing the body rig…"
                     } else {
-                        "Using the photo as uploaded. Preparing motion tracking…"
+                        backgroundImage = decoded
+                        uploadedImage = null
+                        status = "Could not separate this person cleanly. Try a clearer photo with a simple background."
                     }
+                    isSegmenting = false
                 }
 
                 if (ContextCompat.checkSelfPermission(
@@ -285,12 +290,13 @@ private fun PerfectMotionHome() {
                 .fillMaxSize()
                 .background(Midnight)
         ) {
-            if (uploadedImage != null) {
+            if (referenceSourceImage != null) {
                 AndroidView(
                     factory = { viewContext -> AvatarMeshView(viewContext) },
                     modifier = Modifier.fillMaxSize(),
                     update = { view ->
                         view.setFrame(
+                            backgroundImage ?: referenceSourceImage,
                             uploadedImage,
                             referencePose,
                             livePose,
@@ -410,7 +416,7 @@ private fun PerfectMotionHome() {
                                 )
                             }
                         }
-                        uploadedImage == null -> Text(
+                        referenceSourceImage == null -> Text(
                             "Your camera",
                             modifier = Modifier.align(Alignment.Center),
                             color = Muted,
@@ -422,7 +428,7 @@ private fun PerfectMotionHome() {
                                 livePose = pose
                                 if (baselineLivePose.size < 3 && pose.size >= 3) {
                                     baselineLivePose = pose.toMap()
-                                    status = "Motion linked. Your photo now follows your movement."
+                                    status = "Motion linked. The person moves while the background stays fixed."
                                 }
                             }
                         )
@@ -442,7 +448,7 @@ private fun PerfectMotionHome() {
                 }
             }
 
-            if (uploadedImage != null) {
+            if (referenceSourceImage != null) {
                 Row(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -453,9 +459,11 @@ private fun PerfectMotionHome() {
                 ) {
                     Text(
                         when {
-                            isPreparing -> "PREPARING PHOTO RIG"
+                            isSegmenting -> "SEPARATING PERSON"
+                            isPreparing -> "PREPARING BODY RIG"
+                            uploadedImage == null -> "PERSON CUT-OUT UNAVAILABLE"
                             referencePose.size < 3 -> "PHOTO RIG NOT READY"
-                            livePose.size >= 3 && baselineLivePose.size >= 3 -> "LIVE 2.5D MOTION"
+                            livePose.size >= 3 && baselineLivePose.size >= 3 -> "LIVE BODY MOTION"
                             else -> "CAMERA: FINDING BODY"
                         },
                         modifier = Modifier
@@ -463,7 +471,7 @@ private fun PerfectMotionHome() {
                             .clip(RoundedCornerShape(18.dp))
                             .background(Color(0xCC080F25))
                             .padding(horizontal = 14.dp, vertical = 12.dp),
-                        color = if (referencePose.size >= 3 && livePose.size >= 3) Accent else Color.White,
+                        color = if (uploadedImage != null && referencePose.size >= 3 && livePose.size >= 3) Accent else Color.White,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.8.sp,
