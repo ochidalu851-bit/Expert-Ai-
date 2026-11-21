@@ -120,6 +120,7 @@ private fun PerfectMotionHome() {
     var referencePose by remember { mutableStateOf<Map<String, Point2>>(emptyMap()) }
     var status by remember { mutableStateOf("Upload a full-body image to begin") }
     var isPreparing by remember { mutableStateOf(false) }
+    var isSegmenting by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var serverUrl by remember {
         mutableStateOf(
@@ -159,7 +160,19 @@ private fun PerfectMotionHome() {
                 uploadedImage = decoded
                 referencePose = emptyMap()
                 livePose = emptyMap()
-                status = "Image loaded. Opening your front camera…"
+                isSegmenting = true
+                status = "Separating the person from the photo background and opening your front camera…"
+
+                ImageSubjectSegmenter.cutOut(decoded) { cutout, segmentationError ->
+                    uploadedImage = cutout ?: decoded
+                    isSegmenting = false
+                    status = if (cutout != null) {
+                        "Person isolated. Preparing the motion rig…"
+                    } else {
+                        "Using the original photo. Background isolation was not available for this image."
+                    }
+                }
+
                 val hasPermission = ContextCompat.checkSelfPermission(
                     context,
                     Manifest.permission.CAMERA
@@ -173,7 +186,8 @@ private fun PerfectMotionHome() {
         }
     }
 
-    LaunchedEffect(uploadedImage, serverUrl, appToken) {
+    LaunchedEffect(uploadedImage, serverUrl, appToken, isSegmenting) {
+        if (isSegmenting) return@LaunchedEffect
         val image = uploadedImage ?: return@LaunchedEffect
         if (serverUrl.isBlank() || appToken.isBlank()) {
             status = if (cameraAllowed) {
@@ -185,7 +199,7 @@ private fun PerfectMotionHome() {
         }
 
         isPreparing = true
-        status = "OpenAI is analysing the uploaded image and locating body landmarks…"
+        status = if (isSegmenting) "Separating the subject…" else "OpenAI is analysing the isolated subject and locating body landmarks…"
         try {
             val joints = withContext(Dispatchers.IO) {
                 MotionAiClient.prepareAvatar(
