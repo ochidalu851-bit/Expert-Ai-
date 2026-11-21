@@ -15,11 +15,11 @@ object MotionAiClient {
         appToken: String
     ): Map<String, Point2> {
         val imageBytes = ByteArrayOutputStream().use { output ->
-            image.compress(Bitmap.CompressFormat.JPEG, 88, output)
+            image.compress(Bitmap.CompressFormat.PNG, 100, output)
             output.toByteArray()
         }
         val imageDataUrl =
-            "data:image/jpeg;base64," + Base64.encodeToString(imageBytes, Base64.NO_WRAP)
+            "data:image/png;base64," + Base64.encodeToString(imageBytes, Base64.NO_WRAP)
 
         val endpoint = URL(baseUrl.trimEnd('/') + "/api/prepare-avatar")
         val connection = (endpoint.openConnection() as HttpURLConnection).apply {
