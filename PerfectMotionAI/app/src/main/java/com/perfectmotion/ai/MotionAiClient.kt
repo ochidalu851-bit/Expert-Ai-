@@ -85,4 +85,52 @@ object MotionAiClient {
             connection.disconnect()
         }
     }
+    fun export8kFrame(
+        image: Bitmap,
+        baseUrl: String,
+        appToken: String
+    ): ByteArray {
+        val imageBytes = ByteArrayOutputStream().use { output ->
+            image.compress(Bitmap.CompressFormat.PNG, 100, output)
+            output.toByteArray()
+        }
+        val imageDataUrl =
+            "data:image/png;base64," + Base64.encodeToString(imageBytes, Base64.NO_WRAP)
+
+        val endpoint = URL(baseUrl.trimEnd('/') + "/api/export-8k")
+        val connection = (endpoint.openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = 15_000
+            readTimeout = 120_000
+            doOutput = true
+            setRequestProperty("Content-Type", "application/json")
+            setRequestProperty("Accept", "image/webp")
+            setRequestProperty("X-App-Token", appToken)
+        }
+
+        try {
+            val body = JSONObject()
+                .put("imageDataUrl", imageDataUrl)
+                .toString()
+                .toByteArray(Charsets.UTF_8)
+            connection.outputStream.use { it.write(body) }
+
+            val status = connection.responseCode
+            if (status !in 200..299) {
+                val message = connection.errorStream
+                    ?.bufferedReader()
+                    ?.use { it.readText() }
+                    .orEmpty()
+                val error = runCatching { JSONObject(message).optString("error") }
+                    .getOrNull()
+                    .orEmpty()
+                throw IOException(error.ifBlank { "8K export failed with HTTP $status." })
+            }
+
+            return connection.inputStream.use { it.readBytes() }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
 }
