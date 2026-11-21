@@ -44,7 +44,7 @@ android {
         jvmTarget = "17"
     }
 
-    buildConfigField("String", "DEFAULT_AI_SERVER_URL", "\"\"")
+    buildConfigField("String", "DEFAULT_AI_SERVER_URL", "\"https://perfectmotion-ai-api-production.up.railway.app\"")
 }
 
 dependencies {
