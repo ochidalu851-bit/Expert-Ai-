@@ -22,9 +22,15 @@ The workflow builds a debug APK and publishes it as an artifact named `PerfectMo
 
 ## OpenAI image service
 
-Deploy `server/` to a Node.js 22 host that provides HTTPS. Set these server environment variables:
+The live service is deployed at:
 
-- `OPENAI_API_KEY`: a project API key created in OpenAI Platform.
+`https://perfectmotion-ai-api-production.up.railway.app`
+
+Railway project: `PerfectMotion AI`. Service: `perfectmotion-ai-api`. The Android Gradle config now pre-fills this HTTPS URL.
+
+Set these server environment variables in the Railway service's Variables tab:
+
+- `OPENAI_API_KEY`: a newly rotated project API key created in OpenAI Platform. Never use an API key pasted into chat or committed to GitHub.
 - `OPENAI_VISION_MODEL`: defaults to `gpt-6.2-astra`, a vision-capable Responses API model.
 - `PERFECTMOTION_API_TOKEN`: a long random app access token shared with the Android app.
 - `PORT`: optional; defaults to `8080`.
@@ -47,7 +53,7 @@ Never paste the OpenAI API key into a GitHub source file, Android Settings, or t
 4. Add `PERFECTMOTION_API_TOKEN` with a separate random app token, not the OpenAI key.
 5. Deploy/redeploy the service after saving.
 
-The Railway project has been created, but the connected Free plan currently refuses to provision a service because its resource limit is reached. Once Railway permits a service to be created, the variables above are the exact place for the key. The service root directory must be `/PerfectMotionAI/server`, and its health check path is `/health`.
+The Railway service is now deployed from the `perfectmotion-ai` branch. Its root directory is `/PerfectMotionAI/server`, Dockerfile is `Dockerfile`, and health check path is `/health`. The OpenAI API key is intentionally not configured yet because the key pasted into chat is exposed and must be revoked first.
 
 ## Motion and output quality
 
