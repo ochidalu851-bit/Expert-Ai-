@@ -44,11 +44,7 @@ android {
         jvmTarget = "17"
     }
 
-    buildConfigField(
-        "String",
-        "DEFAULT_AI_SERVER_URL",
-        "\"\${providers.gradleProperty("PERFECTMOTION_API_BASE_URL").orElse("").get()}\""
-    )
+    buildConfigField("String", "DEFAULT_AI_SERVER_URL", "\"\"")
 }
 
 dependencies {
