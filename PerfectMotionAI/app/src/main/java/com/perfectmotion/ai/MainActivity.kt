@@ -269,7 +269,7 @@ private fun PerfectMotionHome() {
         status = "Finding body joints on this phone…"
         try {
             val joints = withContext(Dispatchers.Default) {
-                PhotoPoseAnalyzer.detect(source)
+                PhotoPoseAnalyzer.detect(context, source)
             }
             referencePose = joints
             status = if (joints.size >= 3) {
@@ -767,8 +767,8 @@ private fun CameraMirrorPane(
         }
     }
     val executor = remember { Executors.newSingleThreadExecutor() }
-    val analyzer = remember {
-        PoseAnalyzer { points ->
+    val analyzer = remember(context) {
+        PoseAnalyzer(context) { points ->
             overlayPose = points
             latestOnPose.value(points)
         }

@@ -47,6 +47,15 @@ jobs:
       - name: Install Android API 36
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
+      - name: Download MediaPipe Pose Landmarker model
+        run: |
+          mkdir -p PerfectMotionAI/app/src/main/assets
+          curl --fail --location --retry 3 --retry-delay 2 \
+            "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task" \
+            --output PerfectMotionAI/app/src/main/assets/pose_landmarker_lite.task
+          test -s PerfectMotionAI/app/src/main/assets/pose_landmarker_lite.task
+          echo "MediaPipe Pose Landmarker model downloaded."
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:

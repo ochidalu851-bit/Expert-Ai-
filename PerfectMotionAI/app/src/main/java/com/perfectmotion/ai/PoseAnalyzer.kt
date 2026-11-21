@@ -1,88 +1,121 @@
 package com.perfectmotion.ai
 
+import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
+import android.util.Log
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.pose.PoseDetection
-import com.google.mlkit.vision.pose.PoseLandmark
-import com.google.mlkit.vision.pose.defaults.PoseDetectorOptions
+import com.google.mediapipe.framework.image.BitmapImageBuilder
+import com.google.mediapipe.tasks.core.BaseOptions
+import com.google.mediapipe.tasks.vision.core.ImageProcessingOptions
+import com.google.mediapipe.tasks.vision.core.RunningMode
+import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker
+import kotlin.math.abs
 
+/**
+ * On-device, continuous 33-point pose tracking.
+ *
+ * The detector runs in MediaPipe LIVE_STREAM mode and returns both normalized
+ * image coordinates and 3D world coordinates. A light temporal filter reduces
+ * jitter while preserving responsive movement.
+ */
 class PoseAnalyzer(
+    context: Context,
     private val onPose: (Map<String, Point2>) -> Unit
 ) : ImageAnalysis.Analyzer {
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val detector = PoseDetection.getClient(
-        PoseDetectorOptions.Builder()
-            .setDetectorMode(PoseDetectorOptions.STREAM_MODE)
+    private val lock = Any()
+    private var previousPose: Map<String, Point2> = emptyMap()
+    @Volatile private var isClosed = false
+
+    private val landmarker: PoseLandmarker = PoseLandmarker.createFromOptions(
+        context.applicationContext,
+        PoseLandmarker.PoseLandmarkerOptions.builder()
+            .setBaseOptions(
+                BaseOptions.builder()
+                    .setModelAssetPath("pose_landmarker_lite.task")
+                    .build()
+            )
+            .setRunningMode(RunningMode.LIVE_STREAM)
+            .setNumPoses(1)
+            .setMinPoseDetectionConfidence(0.45f)
+            .setMinPosePresenceConfidence(0.45f)
+            .setMinTrackingConfidence(0.45f)
+            .setOutputSegmentationMasks(false)
+            .setResultListener { result, _ ->
+                if (isClosed) return@setResultListener
+                val detected = PoseLandmarkMapper.map(result)
+                if (detected.isNotEmpty()) {
+                    val filtered = smooth(detected)
+                    mainHandler.post {
+                        if (!isClosed) onPose(filtered)
+                    }
+                }
+            }
+            .setErrorListener { error ->
+                Log.w("PerfectMotionAI", "MediaPipe pose tracking error", error)
+            }
             .build()
     )
 
     override fun analyze(imageProxy: ImageProxy) {
-        val mediaImage = imageProxy.image
-        if (mediaImage == null) {
+        if (isClosed) {
             imageProxy.close()
             return
         }
 
-        val rotation = imageProxy.imageInfo.rotationDegrees
-        val input = InputImage.fromMediaImage(mediaImage, rotation)
-        val uprightWidth = if (rotation == 90 || rotation == 270) {
-            imageProxy.height.toFloat()
-        } else {
-            imageProxy.width.toFloat()
+        try {
+            // Convert CameraX's YUV frame to a bitmap so CameraX can release the
+            // ImageProxy immediately while MediaPipe processes the copied frame.
+            val bitmap = imageProxy.toBitmap()
+            val mpImage = BitmapImageBuilder(bitmap).build()
+            val processingOptions = ImageProcessingOptions.builder()
+                .setRotationDegrees(imageProxy.imageInfo.rotationDegrees)
+                .build()
+
+            landmarker.detectAsync(
+                mpImage,
+                processingOptions,
+                SystemClock.uptimeMillis()
+            )
+        } catch (error: Exception) {
+            Log.w("PerfectMotionAI", "Could not submit camera frame to MediaPipe", error)
+        } finally {
+            imageProxy.close()
         }
-        val uprightHeight = if (rotation == 90 || rotation == 270) {
-            imageProxy.width.toFloat()
-        } else {
-            imageProxy.height.toFloat()
+    }
+
+    private fun smooth(next: Map<String, Point2>): Map<String, Point2> {
+        synchronized(lock) {
+            val alpha = 0.62f
+            val filtered = next.mapValues { (name, current) ->
+                val previous = previousPose[name]
+                if (previous == null || abs(current.x - previous.x) > 0.42f ||
+                    abs(current.y - previous.y) > 0.42f
+                ) {
+                    current
+                } else {
+                    Point2(
+                        x = previous.x + (current.x - previous.x) * alpha,
+                        y = previous.y + (current.y - previous.y) * alpha,
+                        z = previous.z + (current.z - previous.z) * alpha,
+                        world = current.world,
+                        visibility = current.visibility
+                    )
+                }
+            }
+            previousPose = filtered
+            return filtered
         }
-
-        detector.process(input)
-            .addOnSuccessListener { pose ->
-                val points = linkedMapOf<String, Point2>()
-                val mapping = listOf(
-                    "nose" to PoseLandmark.NOSE,
-                    "left_shoulder" to PoseLandmark.LEFT_SHOULDER,
-                    "right_shoulder" to PoseLandmark.RIGHT_SHOULDER,
-                    "left_elbow" to PoseLandmark.LEFT_ELBOW,
-                    "right_elbow" to PoseLandmark.RIGHT_ELBOW,
-                    "left_wrist" to PoseLandmark.LEFT_WRIST,
-                    "right_wrist" to PoseLandmark.RIGHT_WRIST,
-                    "left_hip" to PoseLandmark.LEFT_HIP,
-                    "right_hip" to PoseLandmark.RIGHT_HIP,
-                    "left_knee" to PoseLandmark.LEFT_KNEE,
-                    "right_knee" to PoseLandmark.RIGHT_KNEE,
-                    "left_ankle" to PoseLandmark.LEFT_ANKLE,
-                    "right_ankle" to PoseLandmark.RIGHT_ANKLE
-                )
-
-                mapping.forEach { (name, type) ->
-                    val landmark = pose.getPoseLandmark(type)
-                    if (landmark != null && landmark.inFrameLikelihood >= 0.35f) {
-                        val rawX = (landmark.position.x / uprightWidth).coerceIn(0f, 1f)
-                        val x = rawX
-                        val y = (landmark.position.y / uprightHeight).coerceIn(0f, 1f)
-                        points[name] = Point2(x, y)
-                    }
-                }
-
-                mainHandler.post {
-                    onPose(points)
-                }
-            }
-            .addOnFailureListener {
-                mainHandler.post {
-                    onPose(emptyMap())
-                }
-            }
-            .addOnCompleteListener {
-                imageProxy.close()
-            }
     }
 
     fun close() {
-        detector.close()
+        isClosed = true
+        landmarker.close()
+        synchronized(lock) {
+            previousPose = emptyMap()
+        }
     }
 }

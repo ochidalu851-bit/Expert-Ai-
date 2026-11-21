@@ -92,8 +92,11 @@ class AvatarMeshView(context: Context) : View(context) {
             val baseline = baselinePose[name] ?: return@forEach
             val current = livePose[name] ?: return@forEach
             val target = Point2(
-                (source.x + (current.x - baseline.x) * 1.55f).coerceIn(-0.25f, 1.25f),
-                (source.y + (current.y - baseline.y) * 1.55f).coerceIn(-0.25f, 1.25f)
+                x = (source.x + (current.x - baseline.x) * 1.55f).coerceIn(-0.25f, 1.25f),
+                y = (source.y + (current.y - baseline.y) * 1.55f).coerceIn(-0.25f, 1.25f),
+                z = source.z + (current.z - baseline.z) * 1.35f,
+                world = current.world,
+                visibility = current.visibility
             )
             result[name] = JointMotion(source, target)
         }
@@ -191,9 +194,16 @@ class AvatarMeshView(context: Context) : View(context) {
         val liveRight = livePose["right_shoulder"]
         val baseWidth = distance(baseLeft, baseRight)
         val currentWidth = distance(liveLeft, liveRight)
-        val depthScale = if (baseWidth > 0.04f && currentWidth > 0.01f) {
+        val shoulderWidthScale = if (baseWidth > 0.04f && currentWidth > 0.01f) {
             (currentWidth / baseWidth).coerceIn(0.88f, 1.14f)
         } else 1f
+        val baseDepth = ((baselinePose["left_shoulder"]?.z ?: 0f) +
+            (baselinePose["right_shoulder"]?.z ?: 0f)) / 2f
+        val liveDepth = ((livePose["left_shoulder"]?.z ?: baseDepth) +
+            (livePose["right_shoulder"]?.z ?: baseDepth)) / 2f
+        // MediaPipe's normalized z gets smaller as a point approaches the camera.
+        val zDepthScale = (1f + (baseDepth - liveDepth) * 0.72f).coerceIn(0.90f, 1.10f)
+        val depthScale = (shoulderWidthScale * zDepthScale).coerceIn(0.82f, 1.18f)
 
         val baseMid = midpoint(baseLeft, baseRight)
         val liveMid = midpoint(liveLeft, liveRight)

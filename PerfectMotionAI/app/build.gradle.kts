@@ -66,6 +66,7 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$cameraX")
     implementation("androidx.camera:camera-view:$cameraX")
 
-    implementation("com.google.mlkit:pose-detection:18.0.0-beta5")
+    // MediaPipe 0.10.x keeps the app compatible with Android 7 (API 24).
+    implementation("com.google.mediapipe:tasks-vision:0.10.35")
     implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
 }
