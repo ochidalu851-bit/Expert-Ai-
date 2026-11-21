@@ -1,4 +1,5 @@
 name: PerfectMotion AI Android
+# Build on the dedicated app branch; the default branch contains only the reusable workflow.
 
 on:
   push:
