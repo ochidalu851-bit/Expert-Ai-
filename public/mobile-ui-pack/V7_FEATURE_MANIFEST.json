@@ -1,0 +1,65 @@
+{
+  "version": "7.0",
+  "builtOn": "2026-11-10",
+  "source": "User-supplied screen recordings plus existing v6 source package",
+  "features": [
+    {
+      "id": "per-app-permissions",
+      "status": "implemented-local-demo",
+      "details": "Independent permission mode per app; default/global mode remains separate."
+    },
+    {
+      "id": "get-app-permissions",
+      "status": "implemented-local-detail",
+      "details": "Displays app-specific local preference and explicitly unverified provider scopes."
+    },
+    {
+      "id": "get-plugin-dependencies",
+      "status": "implemented-local-detail",
+      "details": "Dedicated dependency view; missing dependencies/services/version constraints are not supplied / not verified."
+    },
+    {
+      "id": "update-app-permissions",
+      "status": "implemented-local-demo",
+      "details": "Updates a selected app permission mode in local browser state only."
+    },
+    {
+      "id": "composer-file-picker",
+      "status": "implemented-local-metadata",
+      "details": "Opens file picker and stores filename/size/MIME/lastModified only; file bytes not uploaded."
+    },
+    {
+      "id": "temporary-chat-isolation",
+      "status": "implemented-local-demo",
+      "details": "Temporary messages are stored separately, and can be saved to history or discarded."
+    },
+    {
+      "id": "keyboard-send",
+      "status": "implemented-local-demo",
+      "details": "Enter sends; Shift+Enter leaves multiline entry available."
+    },
+    {
+      "id": "verify-age",
+      "status": "implemented-local-demo",
+      "details": "Checkbox confirmation only; no identity or age verification performed."
+    },
+    {
+      "id": "trusted-contact",
+      "status": "implemented-local-demo",
+      "details": "Local status toggle only; no contact details collected or linked."
+    }
+  ],
+  "verification": {
+    "syntax": "passed",
+    "nodeIntegrationSuite": "passed",
+    "nodeV7Suite": "passed",
+    "chromiumVisual": "not run; local/localhost navigation blocked"
+  },
+  "limitations": [
+    "No external provider APIs/authentication",
+    "No binary uploads",
+    "No real app permissions or dependencies inspected",
+    "No AI inference or live web search",
+    "No Android-native security or identity verification"
+  ]
+}

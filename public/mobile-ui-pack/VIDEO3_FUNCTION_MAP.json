@@ -1,0 +1,67 @@
+{
+  "snapshotDate": "2026-11-10",
+  "sourceFiles": [
+    "Record_2026-11-10-11-11-06.mp4",
+    "Record_2026-11-10-11-14-12.mp4"
+  ],
+  "pluginDirectory": {
+    "action": "Open Plugins screen",
+    "search": "Filters by visible app name, category and description",
+    "plus": "Adds/removes the matching entry in local browser state; it does not connect the external provider",
+    "rowTap": "Opens the app detail page",
+    "googleDrive": "Shows lock indicator; tap opens an unverified lock explanation",
+    "installed": "Shows the apps added to the local demo",
+    "newAndNoteworthy": [
+      "iCloud Mail",
+      "iCloud Calendar"
+    ]
+  },
+  "pluginManagement": {
+    "detailSections": [
+      "Skills",
+      "Read actions",
+      "Write actions"
+    ],
+    "skillId": "plugin-management",
+    "skillToggle": "Use skill on/off",
+    "readActions": [
+      "get app permissions",
+      "get plugin dependencies"
+    ],
+    "writeActions": [
+      "Uninstall app",
+      "Update app permissions"
+    ],
+    "permissionModes": [
+      "Always ask",
+      "Allow read actions",
+      "Allow low-risk actions"
+    ]
+  },
+  "chatMenu": [
+    "Share",
+    "Pin",
+    "Lock chat",
+    "Add to project",
+    "Uploaded files",
+    "Find in chat",
+    "Add to home",
+    "Archive",
+    "Delete"
+  ],
+  "responseActions": [
+    "Copy",
+    "Positive feedback",
+    "Negative feedback",
+    "Read aloud",
+    "Share",
+    "More"
+  ],
+  "implementationLimits": [
+    "Provider authentication and live API calls are not implemented.",
+    "Uploaded files retain local filenames only; binary uploads are not sent to a server.",
+    "Pin and lock are local UI states; lock does not invoke Android security.",
+    "Share uses Web Share when available and otherwise explains the offline limitation.",
+    "Speech playback uses browser speech synthesis when available."
+  ]
+}

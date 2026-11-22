@@ -1,0 +1,54 @@
+{
+  "version": "8.0",
+  "source_videos": [
+    {
+      "filename": "Record_2026-11-10-11-54-59.mp4",
+      "duration_seconds": 162.558688,
+      "resolution": "480x1066",
+      "observed_flows": [
+        "Account and Customize overview with app counts",
+        "Plugins app directory with separate plus buttons and lock state",
+        "App-specific connector consent sheet",
+        "Gmail suggested skill cards",
+        "GitHub app detail, Apps list and Information metadata",
+        "Google Drive app detail and Google Docs / Google Drive Comments / Google Sheets / Google Slides skill chips",
+        "Google Sheets skill instructions and workflow guidance",
+        "ElevenLabs app description and visible agents skills",
+        "Tripsy app detail and travel task cards",
+        "Dropbox and other connector listings",
+        "Install plugin action at the bottom of app details"
+      ]
+    },
+    {
+      "filename": "Record_2026-11-10-12-12-44.mp4",
+      "duration_seconds": 37.385333,
+      "resolution": "480x1066",
+      "observed_flows": [
+        "Conversation composer plus sheet",
+        "Camera picker / capture flow",
+        "Photos picker",
+        "Files app-style picker with Upload files and Recent items",
+        "Plugins nested tool menu",
+        "Create image, Search, Thinking, Deep research and Study tool choices",
+        "Think harder quick action",
+        "Mobile keyboard visible while composing"
+      ]
+    }
+  ],
+  "implemented_flows": {
+    "connector_details": "App details now show app icon/monogram, publisher when legible, description, app targets, skill list, capabilities, developer, website, version, privacy policy, terms, authentication and permissions. Unseen fields remain not supplied / not verified.",
+    "skills": "Skill cards open a dedicated skill detail screen with a local Use skill switch, source/status notes and Use in chat action. The exact skill names visible in the source are preserved; illustrative task examples are labelled as such.",
+    "install": "Install plugin and directory plus actions open an app-specific consent sheet with disclosures about memory, chat context, suggested prompts and model improvement. Continue only adds the record to the local demo; it never marks the provider connected.",
+    "composer": "Plus opens Camera, Photos, Files, Plugins and Think harder. Camera and Photos use browser/device picker inputs; Files opens an in-app recent file browser and device upload picker.",
+    "tool_modes": "Plugins opens Create image, Search, Thinking, Deep research, Study and OpenAI Platform. Think harder, Search, Thinking, Deep research and Study toggle local composer modes and can be cleared.",
+    "drawer": "Images, Search, Codex, Explore and Upgrade to Pro are added to the existing drawer while retaining previous navigation entries."
+  },
+  "honesty_and_scope": [
+    "Camera/Photos depend on browser and operating-system picker support.",
+    "Files stores metadata only; it does not upload file bytes to an AI provider.",
+    "Connector OAuth, provider API calls and real account permissions are not connected.",
+    "Search and Deep research do not perform live retrieval in this offline build.",
+    "Thinking and Think harder are interface controls only; hidden reasoning is not exposed.",
+    "Skill names and excerpts that are blurred or not legible in the source video are not invented or represented as official verified metadata."
+  ]
+}

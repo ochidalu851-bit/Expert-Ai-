@@ -1,0 +1,249 @@
+{
+  "package": "Nexa AI — MCPTOP plugin catalogue import",
+  "buildVersion": "5.0",
+  "generatedAt": "2026-11-10",
+  "dataScope": "All record rows present in the seven PDFs in Podcasts.zip; snapshot versions are kept separately and merged only by exact stable record ID for catalogue navigation.",
+  "sourceArchive": "Podcasts.zip",
+  "sourceDocuments": [
+    "mcptop.com_api_servers_source=openai.pdf",
+    "mcptop.com_api_servers_source=openai&page=2.pdf",
+    "mcptop.com_api_servers_source=openai&page=3.pdf",
+    "mcptop.com_api_servers_source=openai&page=4.pdf",
+    "mcptop.com_api_servers_source=openai&page=5.pdf",
+    "mcptop.com_api_servers_source=openai&page=6.pdf",
+    "mcptop.com_api_servers_source=openai&page=7.pdf"
+  ],
+  "snapshotCoverage": [
+    {
+      "snapshotId": "mcptop-2026-11-09-page-1",
+      "sourceName": "MCPTOP API directory",
+      "sourceParameter": "openai",
+      "metric": "order",
+      "snapshotDate": "2026-11-09",
+      "sourceUrl": "https://mcptop.com/api/servers?source=openai&page=1",
+      "sourceUrlStatus": "inferred_from_pdf_filename_not_independently_verified",
+      "apiPageNumber": 1,
+      "pagesInSnapshotAccordingToHeader": 7,
+      "snapshotHeaderCount": 12404,
+      "recordsInSuppliedPdfPart": 2000,
+      "rankCoverage": [
+        1,
+        2000
+      ],
+      "pdfFilename": "mcptop.com_api_servers_source=openai.pdf",
+      "physicalPdfPages": 1477,
+      "partialExtractions": 0,
+      "missingNames": 0,
+      "coverageNote": "Only this API page/PDF part was supplied in the ZIP; do not infer that the full header count is present."
+    },
+    {
+      "snapshotId": "mcptop-2026-11-10-page-2",
+      "sourceName": "MCPTOP API directory",
+      "sourceParameter": "openai",
+      "metric": "order",
+      "snapshotDate": "2026-11-10",
+      "sourceUrl": "https://mcptop.com/api/servers?source=openai&page=2",
+      "sourceUrlStatus": "inferred_from_pdf_filename_not_independently_verified",
+      "apiPageNumber": 2,
+      "pagesInSnapshotAccordingToHeader": 7,
+      "snapshotHeaderCount": 12629,
+      "recordsInSuppliedPdfPart": 2000,
+      "rankCoverage": [
+        2001,
+        4000
+      ],
+      "pdfFilename": "mcptop.com_api_servers_source=openai&page=2.pdf",
+      "physicalPdfPages": null,
+      "partialExtractions": 8,
+      "missingNames": 0,
+      "coverageNote": "Only this API page/PDF part was supplied in the ZIP; do not infer that the full header count is present."
+    },
+    {
+      "snapshotId": "mcptop-2026-11-10-page-3",
+      "sourceName": "MCPTOP API directory",
+      "sourceParameter": "openai",
+      "metric": "order",
+      "snapshotDate": "2026-11-10",
+      "sourceUrl": "https://mcptop.com/api/servers?source=openai&page=3",
+      "sourceUrlStatus": "inferred_from_pdf_filename_not_independently_verified",
+      "apiPageNumber": 3,
+      "pagesInSnapshotAccordingToHeader": 7,
+      "snapshotHeaderCount": 12629,
+      "recordsInSuppliedPdfPart": 2000,
+      "rankCoverage": [
+        4001,
+        6000
+      ],
+      "pdfFilename": "mcptop.com_api_servers_source=openai&page=3.pdf",
+      "physicalPdfPages": null,
+      "partialExtractions": 5,
+      "missingNames": 0,
+      "coverageNote": "Only this API page/PDF part was supplied in the ZIP; do not infer that the full header count is present."
+    },
+    {
+      "snapshotId": "mcptop-2026-11-10-page-4",
+      "sourceName": "MCPTOP API directory",
+      "sourceParameter": "openai",
+      "metric": "order",
+      "snapshotDate": "2026-11-10",
+      "sourceUrl": "https://mcptop.com/api/servers?source=openai&page=4",
+      "sourceUrlStatus": "inferred_from_pdf_filename_not_independently_verified",
+      "apiPageNumber": 4,
+      "pagesInSnapshotAccordingToHeader": 7,
+      "snapshotHeaderCount": 12629,
+      "recordsInSuppliedPdfPart": 2000,
+      "rankCoverage": [
+        6001,
+        8000
+      ],
+      "pdfFilename": "mcptop.com_api_servers_source=openai&page=4.pdf",
+      "physicalPdfPages": null,
+      "partialExtractions": 2,
+      "missingNames": 0,
+      "coverageNote": "Only this API page/PDF part was supplied in the ZIP; do not infer that the full header count is present."
+    },
+    {
+      "snapshotId": "mcptop-2026-11-10-page-5",
+      "sourceName": "MCPTOP API directory",
+      "sourceParameter": "openai",
+      "metric": "order",
+      "snapshotDate": "2026-11-10",
+      "sourceUrl": "https://mcptop.com/api/servers?source=openai&page=5",
+      "sourceUrlStatus": "inferred_from_pdf_filename_not_independently_verified",
+      "apiPageNumber": 5,
+      "pagesInSnapshotAccordingToHeader": 7,
+      "snapshotHeaderCount": 12629,
+      "recordsInSuppliedPdfPart": 2000,
+      "rankCoverage": [
+        8001,
+        10000
+      ],
+      "pdfFilename": "mcptop.com_api_servers_source=openai&page=5.pdf",
+      "physicalPdfPages": null,
+      "partialExtractions": 3,
+      "missingNames": 0,
+      "coverageNote": "Only this API page/PDF part was supplied in the ZIP; do not infer that the full header count is present."
+    },
+    {
+      "snapshotId": "mcptop-2026-11-10-page-6",
+      "sourceName": "MCPTOP API directory",
+      "sourceParameter": "openai",
+      "metric": "order",
+      "snapshotDate": "2026-11-10",
+      "sourceUrl": "https://mcptop.com/api/servers?source=openai&page=6",
+      "sourceUrlStatus": "inferred_from_pdf_filename_not_independently_verified",
+      "apiPageNumber": 6,
+      "pagesInSnapshotAccordingToHeader": 7,
+      "snapshotHeaderCount": 12629,
+      "recordsInSuppliedPdfPart": 2000,
+      "rankCoverage": [
+        10001,
+        12000
+      ],
+      "pdfFilename": "mcptop.com_api_servers_source=openai&page=6.pdf",
+      "physicalPdfPages": null,
+      "partialExtractions": 11,
+      "missingNames": 10,
+      "coverageNote": "Only this API page/PDF part was supplied in the ZIP; do not infer that the full header count is present."
+    },
+    {
+      "snapshotId": "mcptop-2026-11-10-page-7",
+      "sourceName": "MCPTOP API directory",
+      "sourceParameter": "openai",
+      "metric": "order",
+      "snapshotDate": "2026-11-10",
+      "sourceUrl": "https://mcptop.com/api/servers?source=openai&page=7",
+      "sourceUrlStatus": "inferred_from_pdf_filename_not_independently_verified",
+      "apiPageNumber": 7,
+      "pagesInSnapshotAccordingToHeader": 7,
+      "snapshotHeaderCount": 12629,
+      "recordsInSuppliedPdfPart": 629,
+      "rankCoverage": [
+        12001,
+        12629
+      ],
+      "pdfFilename": "mcptop.com_api_servers_source=openai&page=7.pdf",
+      "physicalPdfPages": null,
+      "partialExtractions": 7,
+      "missingNames": 7,
+      "coverageNote": "Only this API page/PDF part was supplied in the ZIP; do not infer that the full header count is present."
+    }
+  ],
+  "totals": {
+    "sourceRecordOccurrences": 12629,
+    "uniqueStableRecordIds": 12618,
+    "duplicateStableIdsWithMultipleSnapshotVersions": 11,
+    "november9RowsActuallySupplied": 2000,
+    "november10RowsActuallySupplied": 10629,
+    "partiallyExtractedRows": 36,
+    "recordsWithNameNotSupplied": 17,
+    "listingKindCounts": {
+      "app": 11316,
+      "plugin": 1263,
+      "connector": 39
+    },
+    "sourceVerificationValues": {
+      "None": 12618
+    },
+    "categoryOccurrences": {
+      "productivity": 3274,
+      "entertainment": 443,
+      "developer tools": 989,
+      "communication": 164,
+      "business & operations": 2216,
+      "finance": 1031,
+      "healthcare": 252,
+      "creativity": 838,
+      "data & analytics": 723,
+      "education & research": 938,
+      "scientific research": 40,
+      "other": 871,
+      "travel": 758,
+      "security": 80,
+      "Analytics": 1
+    },
+    "sourcePdfCount": 7,
+    "unavailableRowsSourceVerified": 0,
+    "unsupportedRowsSourceVerified": 0,
+    "connectedRowsAuthenticated": 0
+  },
+  "importantSnapshotWarning": "The ZIP does not contain a complete November 9, 2026 snapshot. It contains only page 1 (2,000 rows) whose header says count=12,404 and pages=7, plus pages 2–7 of a separate November 10, 2026 snapshot whose header says count=12,629. Do not combine these into a claim that all 12,404 November 9 rows were supplied.",
+  "reconciliation": "Exact stable IDs are grouped into one catalogue record with separate dated source versions in snapshots[]. This is record-level reconciliation; conflicting source values remain preserved in each snapshot entry. No fuzzy-name matching was used.",
+  "sourceUrlCaveat": "MCPTOP URL patterns are inferred from the PDF filenames and embedded page numbering; the exact URL was not independently verified from a live API. Each page record carries this status.",
+  "openAppsNovember8": {
+    "snapshotDate": "2026-11-08",
+    "sourceName": "OpenApps",
+    "status": "not supplied in Podcasts.zip and not found in the available Library search",
+    "recordCount": "not supplied",
+    "officialRecordRowsImported": 0,
+    "taxonomyNote": "The user-described six families and thirteen categories are taxonomy summaries only; they are not treated as individual records and are not substituted with MCPTOP rows.",
+    "expectedFamilyCount": 6,
+    "expectedCategoryCount": 13,
+    "familyNames": "not supplied / not verified",
+    "categoryNames": "not supplied / not verified"
+  },
+  "recordFieldQuality": {
+    "name": "Source-supplied when extracted; missing/damaged names left null.",
+    "publisher": "Source-supplied author.name when present; missing/damaged values left null.",
+    "description": "MCPTOP oneLiner only; no expanded descriptions supplied.",
+    "icon": "Source icon URL when supplied; ownership and fetch availability not independently verified.",
+    "functions": "Not supplied / not verified in the PDFs.",
+    "toolsActions": "toolCount source field retained (0 for all supplied records); individual tool/action definitions not supplied.",
+    "apis": "Not supplied / not verified. directoryUrl is a directory listing URL, not an API endpoint.",
+    "permissions": "Not supplied / not verified.",
+    "authentication": "Not supplied / not verified.",
+    "verification": "isVerified is null for all supplied row occurrences; therefore records are not marked verified.",
+    "officialIcon": "Source-provided icon URL only; official ownership and live fetch are not independently verified."
+  },
+  "familyMapping": "Nexa family tags are inferred locally from MCPTOP categories, names, slugs and oneLiner descriptions; not official MCPTOP labels. The original source categories are retained independently.",
+  "activityStatusLibrary": {
+    "count": 422,
+    "status": "generated-proposed-draft; original 422-item source wording not supplied",
+    "original422SourceFound": false,
+    "note": "The previously referenced original 422-item vocabulary was not present in the supplied ZIP or located by available Library search. This is a newly drafted 422-item substitute (34 milestone messages for each of 12 families plus 14 cross-family statuses), not a claim that the original wording was preserved.",
+    "preservedInPackage": true
+  },
+  "sourceRecordOccurrencesExport": "mcptop_source_record_occurrences.json.gz",
+  "snapshotReconciliationDetails": "Each unique stable record retains all exact-ID snapshot versions, including the full extracted sourceRecordFields object for each occurrence.",
+  "sourceArchiveSha256": "798dedc6eb76f1f482e9de96f6e0e0cf934435d0a82813b0d8afccae84efa852"
+}

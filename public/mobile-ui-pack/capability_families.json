@@ -1,0 +1,149 @@
+{
+  "families": [
+    {
+      "id": "thinking-reasoning",
+      "name": "Thinking and reasoning",
+      "description": "Reasoning-oriented assistance, decision support, planning, structured problem solving and synthesis.",
+      "capabilities": [
+        "structured reasoning",
+        "planning",
+        "decision support",
+        "problem solving",
+        "synthesis"
+      ]
+    },
+    {
+      "id": "web-searching",
+      "name": "Web searching",
+      "description": "Finding information across public websites, directories, products, places and current web sources.",
+      "capabilities": [
+        "web search",
+        "source discovery",
+        "web browsing",
+        "current information lookup",
+        "result filtering"
+      ]
+    },
+    {
+      "id": "deep-research",
+      "name": "Deep research",
+      "description": "Multi-source research, evidence gathering, comparison, citation and research synthesis.",
+      "capabilities": [
+        "multi-source research",
+        "evidence review",
+        "citation support",
+        "source comparison",
+        "research synthesis"
+      ]
+    },
+    {
+      "id": "file-inspection",
+      "name": "File and document inspection",
+      "description": "Reading, extracting, inspecting and transforming files and documents such as PDFs, office files and images.",
+      "capabilities": [
+        "document reading",
+        "PDF inspection",
+        "text extraction",
+        "document transformation",
+        "file review"
+      ]
+    },
+    {
+      "id": "data-analysis-code",
+      "name": "Data analysis and code execution",
+      "description": "Working with structured data, calculations, analytics, programming, scripts, dashboards and code execution.",
+      "capabilities": [
+        "data analysis",
+        "calculations",
+        "code generation",
+        "code execution",
+        "analytics"
+      ]
+    },
+    {
+      "id": "image-understanding-generation",
+      "name": "Image understanding and generation",
+      "description": "Understanding images and visual assets, and creating or editing visual content.",
+      "capabilities": [
+        "image understanding",
+        "image generation",
+        "visual editing",
+        "design assistance",
+        "visual interpretation"
+      ]
+    },
+    {
+      "id": "voice-audio",
+      "name": "Voice and audio processing",
+      "description": "Speech, audio, dictation, transcription, voice conversations and audio transformation.",
+      "capabilities": [
+        "speech recognition",
+        "transcription",
+        "voice interaction",
+        "audio processing",
+        "speech generation"
+      ]
+    },
+    {
+      "id": "connected-apps",
+      "name": "Connected apps and connectors",
+      "description": "Accessing external app data and actions through explicitly configured integrations and connectors.",
+      "capabilities": [
+        "app connection",
+        "data access",
+        "connector actions",
+        "external service integration",
+        "authorization"
+      ]
+    },
+    {
+      "id": "multi-step-work",
+      "name": "Multi-step Work and browser operations",
+      "description": "Coordinating multi-step workflows, browser actions, task execution and operations across services.",
+      "capabilities": [
+        "workflow orchestration",
+        "browser operations",
+        "multi-step tasks",
+        "automation",
+        "approval handoff"
+      ]
+    },
+    {
+      "id": "memory-context",
+      "name": "Memory and conversation context",
+      "description": "Retaining user-approved context, retrieving saved information and applying conversation history.",
+      "capabilities": [
+        "memory retrieval",
+        "saved context",
+        "conversation history",
+        "knowledge recall",
+        "context management"
+      ]
+    },
+    {
+      "id": "projects",
+      "name": "Projects",
+      "description": "Organizing ongoing work into projects, shared workspaces, files, tasks and project context.",
+      "capabilities": [
+        "project organization",
+        "shared workspaces",
+        "project files",
+        "task grouping",
+        "project context"
+      ]
+    },
+    {
+      "id": "scheduled-tasks",
+      "name": "Scheduled tasks",
+      "description": "Planning or triggering future and recurring work, reminders, calendar actions and scheduled workflows.",
+      "capabilities": [
+        "scheduled execution",
+        "recurring tasks",
+        "reminders",
+        "calendar workflows",
+        "time-based triggers"
+      ]
+    }
+  ],
+  "mappingStatus": "Nexa inference from listing metadata, not official source taxonomy"
+}

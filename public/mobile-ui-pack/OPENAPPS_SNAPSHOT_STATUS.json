@@ -1,0 +1,14 @@
+{
+  "sourceName": "OpenApps",
+  "snapshotDate": "2026-11-08",
+  "sourceUrl": "not supplied / not verified",
+  "status": "source snapshot not present in uploaded Podcasts.zip; not found in available Library search",
+  "expectedTaxonomySummary": {
+    "familyCount": 6,
+    "categoryCount": 13,
+    "familyNames": "not supplied / not verified",
+    "categoryNames": "not supplied / not verified"
+  },
+  "individualRecordCountImported": 0,
+  "rule": "Do not replace OpenApps rows with MCPTOP records or substitute taxonomy totals for individual records."
+}

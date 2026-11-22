@@ -1,0 +1,40 @@
+{
+  "version": "8.0",
+  "added_files": [
+    "v8-enhancements.js",
+    "VIDEO4_FUNCTION_MAP.json",
+    "VIDEO4_COMPARISON.md",
+    "V8_VALIDATION_REPORT.md",
+    "qa/test_v8_video.js"
+  ],
+  "features": {
+    "connector_app_details_and_skills": true,
+    "app_specific_install_consent": true,
+    "connector_state_not_connected_unless_verified": true,
+    "camera_capture_picker": true,
+    "photos_multi_picker": true,
+    "app_style_files_picker": true,
+    "nested_plugins_tool_menu": true,
+    "think_harder_mode_preview": true,
+    "search_thinking_deep_research_study_modes": true,
+    "drawer_navigation_extensions": true
+  },
+  "test_results": {
+    "v8_interaction_tests": 31,
+    "passed": 31,
+    "failed": 0,
+    "javascript_syntax": "passed",
+    "json_parse": "passed",
+    "index_asset_references": "passed",
+    "zip_integrity": "passed",
+    "sha256_manifest": "regenerated"
+  },
+  "external_dependencies": [
+    "OAuth provider login",
+    "real connector APIs and permission scopes",
+    "live Search and Deep Research services",
+    "AI inference and image generation backend",
+    "browser/device camera and photo-picker support"
+  ],
+  "state_semantics": "Local prototype state only; added_to_demo_not_connected is not a verified provider connection."
+}

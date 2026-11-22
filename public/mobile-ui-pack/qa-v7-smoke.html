@@ -1,0 +1,54 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="styles.css"><title>v7 QA</title></head><body>
+<main class="device" id="device"><div class="statusbar"><span id="clock"></span></div><header class="topbar" id="topbar"></header><section class="screen" id="screen"></section><div class="system-nav"></div><div class="modal-layer" id="modalLayer" hidden></div></main><pre id="qa" style="color:white;white-space:pre-wrap"></pre>
+<script src="app.js"></script>
+<script>window.NEXA_PLUGIN_CATALOGUE={records:[],families:[],categories:[],snapshots:[],recordCount:0,recordOccurrences:0};window.NEXA_ACTIVITY_STATUS_LIBRARY={statuses:[],count:0};</script>
+<script src="catalogue-ui.js"></script><script src="integrations-ui.js"></script><script src="v7-enhancements.js"></script>
+<script>
+(async()=>{
+ const out=[];const check=(n,v)=>out.push((v?'PASS ':'FAIL ')+n);
+ try {
+  nav('plugins');
+  const gmailPlus=screen.querySelector('[data-action="toggleVideoPlugin"][data-plugin="Gmail"]');
+  check('plugins directory displays individual plus controls',!!gmailPlus);
+  gmailPlus?.click();
+  check('plus button adds app locally',prefs.videoPluginAdded.includes('Gmail'));
+  check('added app plus changes to check mark',screen.querySelector('[data-plugin="Gmail"].video-plugin-add')?.textContent==='✓');
+  prefs.activeVideoPlugin='Gmail';
+  nav('videoPluginDetail');
+  screen.querySelector('[data-action="pluginPermissionDetail"]')?.click();
+  check('app permission opens dedicated screen',currentPage==='videoPluginPermissions');
+  screen.querySelector('[data-action="v7SetPluginPermission"][data-mode="Allow read actions"]')?.click();
+  check('permission is stored against Gmail only',prefs.pluginPermissionModes.Gmail==='Allow read actions'&&!prefs.pluginPermissionModes.GitHub);
+  prefs.activeVideoPlugin='Plugin Management';nav('videoPluginDetail');
+  screen.querySelector('[data-plugin-action="get plugin dependencies"]')?.click();
+  check('dependency action opens details and retains unknown state',currentPage==='videoPluginDependencies'&&screen.innerText.includes('Not supplied / not verified'));
+  nav('chat');
+  const originalInputClick=HTMLInputElement.prototype.click;
+  HTMLInputElement.prototype.click=function(){if(this.id==='nexaAttachmentInput')this.dataset.qaClicked='yes';else originalInputClick.call(this);};
+  screen.querySelector('[data-action="composerPlus"]')?.click();
+  modalLayer.querySelector('[data-choice="attach"]')?.click();
+  check('composer attachment action invokes file picker',screen.querySelector('#nexaAttachmentInput')?.dataset.qaClicked==='yes');
+  HTMLInputElement.prototype.click=originalInputClick;
+  const fi=screen.querySelector('#nexaAttachmentInput');
+  if(fi){const dt=new DataTransfer();dt.items.add(new File(['test'],'qa-notes.txt',{type:'text/plain'}));Object.defineProperty(fi,'files',{configurable:true,value:dt.files});fi.dispatchEvent(new Event('change',{bubbles:true}));}
+  check('selected file metadata appears in uploaded files',prefs.chatFileMeta?.some(x=>x.name==='qa-notes.txt'));
+  nav('chatUploads');check('uploaded file page exposes remove control',!!screen.querySelector('[data-action="v7RemoveFile"]'));
+  screen.querySelector('[data-action="v7RemoveFile"]')?.click();
+  check('remove file removes metadata',!prefs.chatFileMeta?.some(x=>x.name==='qa-notes.txt'));
+  prefs.chatHistory=[{role:'user',text:'regular message'}];prefs.temporaryChat=true;prefs.temporaryMessages=[];nav('chat');
+  const inp=screen.querySelector('#chatInput');if(inp)inp.value='temporary message';
+  screen.querySelector('[data-action="sendChat"]')?.click();
+  check('temporary chat sends without adding to regular history',prefs.temporaryMessages?.length===2&&prefs.chatHistory.length===1);
+  prefs.temporaryChat=false;nav('chat');
+  const inp2=screen.querySelector('#chatInput');if(inp2)inp2.value='regular new message';
+  inp2?.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
+  check('Enter key sends regular chat message',prefs.chatHistory.length===3);
+  nav('settings');check('settings includes Verify age, Trusted contact and email',screen.innerText.includes('Verify age')&&screen.innerText.includes('Trusted contact')&&screen.innerText.includes('Email'));
+  nav('verifyAge');screen.querySelector('#v7AgeConfirm').checked=true;screen.querySelector('[data-action="v7VerifyAge"]')?.click();
+  check('age confirmation saves local demo state',prefs.demoAgeVerified===true);
+  nav('trustedContact');screen.querySelector('[data-action="v7TrustedContact"]')?.click();
+  check('trusted contact demo toggle changes state',prefs.trustedContactAdded===true);
+ } catch(e){out.push('ERROR '+(e.stack||e.message));}
+ document.querySelector('#qa').textContent=out.join('\n');document.body.dataset.result=out.every(x=>x.startsWith('PASS'))?'pass':'fail';
+})();
+</script></body></html>

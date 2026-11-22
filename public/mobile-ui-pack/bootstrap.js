@@ -1,1 +1,0 @@
-/* Legacy archive extraction disabled. The standalone app is loaded by index.html. */

@@ -1,0 +1,102 @@
+{
+  "catalogueTitle": "Nexa AI Plugin Catalogue",
+  "sourceArchive": "Podcasts.zip",
+  "sourceArchiveSha256": "798dedc6eb76f1f482e9de96f6e0e0cf934435d0a82813b0d8afccae84efa852",
+  "uniqueStableRecordIds": 12618,
+  "sourceRecordOccurrences": 12629,
+  "listingKindCounts": {
+    "app": 11316,
+    "plugin": 1263,
+    "connector": 39
+  },
+  "duplicateStableIdsWithMultipleSnapshotVersions": 11,
+  "partiallyExtractedRows": 36,
+  "recordsWithNameNotSupplied": 17,
+  "sourcePdfFiles": 7,
+  "capabilityFamilyCount": 12,
+  "mcptopSourceCategoryCount": 15,
+  "activityStatusCount": 422,
+  "activityStatusSourceStatus": "generated-proposed-draft; original wording not supplied",
+  "openAppsSnapshotDate": "2026-11-08",
+  "openAppsIndividualRecordRowsImported": 0,
+  "openAppsTaxonomySummary": {
+    "familyCount": 6,
+    "categoryCount": 13,
+    "labels": "not supplied / not verified"
+  },
+  "snapshots": [
+    {
+      "date": "2026-11-09",
+      "page": 1,
+      "headerCount": 12404,
+      "suppliedRows": 2000,
+      "sourceName": "MCPTOP API directory",
+      "sourceUrl": "https://mcptop.com/api/servers?source=openai&page=1",
+      "sourceUrlStatus": "inferred_from_pdf_filename_not_independently_verified"
+    },
+    {
+      "date": "2026-11-10",
+      "page": 2,
+      "headerCount": 12629,
+      "suppliedRows": 2000,
+      "sourceName": "MCPTOP API directory",
+      "sourceUrl": "https://mcptop.com/api/servers?source=openai&page=2",
+      "sourceUrlStatus": "inferred_from_pdf_filename_not_independently_verified"
+    },
+    {
+      "date": "2026-11-10",
+      "page": 3,
+      "headerCount": 12629,
+      "suppliedRows": 2000,
+      "sourceName": "MCPTOP API directory",
+      "sourceUrl": "https://mcptop.com/api/servers?source=openai&page=3",
+      "sourceUrlStatus": "inferred_from_pdf_filename_not_independently_verified"
+    },
+    {
+      "date": "2026-11-10",
+      "page": 4,
+      "headerCount": 12629,
+      "suppliedRows": 2000,
+      "sourceName": "MCPTOP API directory",
+      "sourceUrl": "https://mcptop.com/api/servers?source=openai&page=4",
+      "sourceUrlStatus": "inferred_from_pdf_filename_not_independently_verified"
+    },
+    {
+      "date": "2026-11-10",
+      "page": 5,
+      "headerCount": 12629,
+      "suppliedRows": 2000,
+      "sourceName": "MCPTOP API directory",
+      "sourceUrl": "https://mcptop.com/api/servers?source=openai&page=5",
+      "sourceUrlStatus": "inferred_from_pdf_filename_not_independently_verified"
+    },
+    {
+      "date": "2026-11-10",
+      "page": 6,
+      "headerCount": 12629,
+      "suppliedRows": 2000,
+      "sourceName": "MCPTOP API directory",
+      "sourceUrl": "https://mcptop.com/api/servers?source=openai&page=6",
+      "sourceUrlStatus": "inferred_from_pdf_filename_not_independently_verified"
+    },
+    {
+      "date": "2026-11-10",
+      "page": 7,
+      "headerCount": 12629,
+      "suppliedRows": 629,
+      "sourceName": "MCPTOP API directory",
+      "sourceUrl": "https://mcptop.com/api/servers?source=openai&page=7",
+      "sourceUrlStatus": "inferred_from_pdf_filename_not_independently_verified"
+    }
+  ],
+  "states": {
+    "available-to-connect": 39,
+    "catalogue-only": 12579,
+    "connected": 0,
+    "disconnected": 12618,
+    "unavailableSourceVerified": 0,
+    "unsupportedSourceVerified": 0,
+    "verified": 0
+  },
+  "dataQuality": "Names, publishers, descriptions, icons and listing fields are source-supplied when present. APIs, auth, permissions and action definitions remain not supplied / not verified."
+}
