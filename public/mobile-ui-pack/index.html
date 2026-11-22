@@ -2,22 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#090909">
-  <meta name="description" content="Expert AI live mobile workspace">
+  <meta name="description" content="Expert AI mobile workspace">
+  <meta name="application-name" content="Expert AI">
+  <link rel="icon" href="/expert-ai-icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="./styles.css?v=railway-20261122">
   <title>Expert AI</title>
-  <style>
-    html, body { margin: 0; min-width: 320px; min-height: 100%; background: #090909; color: #fff; font: 15px system-ui, sans-serif; }
-    #packLoader { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 28px; text-align: center; box-sizing: border-box; }
-    #packLoader strong { color: #fff; font-size: 25px; line-height: 1.1; font-weight: 900; letter-spacing: -.045em; }
-    #packLoader .nexa-startup-mark { width: 68px; height: 68px; display: grid; place-items: center; border-radius: 22px; background: linear-gradient(135deg, #4c9fff, #7664ef); color: #fff; font-size: 40px; line-height: 1; font-weight: 900; box-shadow: 0 14px 48px rgba(83, 132, 255, .3); }
-  </style>
 </head>
 <body>
-  <div id="packLoader" role="status" aria-live="polite">
-    <span class="nexa-startup-mark" aria-hidden="true">✳</span>
-    <strong>Expert AI</strong>
-  </div>
-  <script src="./bootstrap.js?v=live-5"></script>
+  <div id="app"><div class="boot"><div class="brand-mark">✳</div><b>Expert AI</b><span>Opening your workspace…</span></div></div>
+  <script src="./app.js?v=railway-20261122" defer></script>
 </body>
 </html>
