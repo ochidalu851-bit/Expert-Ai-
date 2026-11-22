@@ -1,0 +1,181 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #080808;
+  color: #f5f5f5;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+* { box-sizing: border-box; }
+html, body, #root { width: 100%; min-width: 320px; height: 100%; min-height: 100%; margin: 0; overflow: hidden; }
+button { font: inherit; }
+.expert-app { width: 100%; height: 100dvh; min-height: 100%; background: #080808; }
+.expert-mobile-app { display: block; width: 100%; height: 100%; min-height: 100%; border: 0; background: #080808; }
+.expert-state, .expert-login { display: grid; place-items: center; width: 100%; min-height: 100dvh; padding: 24px; background: #212121; }
+.expert-state { align-content: center; gap: 16px; color: #aebbd0; font-size: 14px; }
+.expert-state-brand { display: grid; justify-items: center; gap: 12px; color: #fff; font-size: 23px; font-weight: 900; letter-spacing: -.045em; }
+.expert-state-mark { display: grid; place-items: center; width: 66px; height: 66px; border-radius: 21px; background: linear-gradient(135deg, #4c9fff, #7664ef); color: #fff; font-size: 39px; font-weight: 900; line-height: 1; box-shadow: 0 12px 44px rgba(83, 132, 255, .32); }
+.expert-spinner { width: 30px; height: 30px; border: 3px solid #344056; border-top-color: #76aaff; border-radius: 50%; animation: nexa-spin 0.9s linear infinite; }
+@keyframes nexa-spin { to { transform: rotate(360deg); } }
+.expert-login-card { width: min(100%, 420px); padding: 36px 30px; text-align: center; border: 0; border-radius: 18px; background: transparent; box-shadow: none; }
+.expert-mark { display: grid; place-items: center; width: 48px; height: 48px; margin: 0 auto 22px; border-radius: 15px; background: #10a37f; color: white; font-size: 27px; font-weight: 900; }
+.expert-kicker { margin: 0 0 8px; color: #b4b4b4; font-size: 11px; font-weight: 700; letter-spacing: .12em; }
+.expert-login-card h1 { margin: 0; font-size: 30px; font-weight: 650; letter-spacing: -.03em; }
+.expert-subtitle { margin: 14px 0 20px; color: #c5c5c5; font-size: 14px; line-height: 1.65; }
+.expert-provider-methods { display: flex; justify-content: center; gap: 12px; margin: 0 0 8px; }
+.expert-provider-method { display: inline-flex; align-items: center; gap: 8px; min-width: 112px; justify-content: center; padding: 9px 12px; border: 1px solid #505050; border-radius: 10px; color: #ededed; font-size: 13px; font-weight: 600; }
+.expert-provider-method svg { width: 19px; height: 19px; flex: 0 0 19px; }
+.expert-provider-note { margin: 0 0 20px; color: #a9a9a9; font-size: 11px; line-height: 1.5; }
+.expert-signin { width: 100%; min-height: 48px; border: 0; border-radius: 12px; background: #10a37f; color: #fff; font-weight: 650; cursor: pointer; }
+.expert-signin:disabled { opacity: .65; cursor: wait; }
+.expert-error { margin: 16px 0 0; color: #ff9a9a; font-size: 12px; line-height: 1.5; }
+.expert-legal { margin: 22px 0 0; color: #a3a3a3; font-size: 11px; line-height: 1.6; }
+
+/* Expert AI sign-in: edge-to-edge black account chooser for mobile. */
+.expert-login-screen {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100dvh;
+  min-height: 100svh;
+  overflow: hidden;
+  padding: max(18px, env(safe-area-inset-top)) 24px calc(24px + env(safe-area-inset-bottom));
+  background: #000;
+  color: #fff;
+}
+.expert-login-brand {
+  position: absolute;
+  top: 40%;
+  left: 24px;
+  right: 24px;
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  transform: translateY(-50%);
+  color: #fff;
+  text-align: center;
+}
+.expert-login-symbol {
+  display: grid;
+  width: 82px;
+  height: 82px;
+  place-items: center;
+  color: #fff;
+  font-size: 76px;
+  font-weight: 400;
+  line-height: 1;
+}
+.expert-login-brand strong {
+  font-size: clamp(30px, 8vw, 40px);
+  font-weight: 700;
+  letter-spacing: -.045em;
+}
+.expert-login-actions {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  display: grid;
+  width: min(calc(100% - 48px), 650px);
+  gap: 14px;
+  margin: 0 auto;
+}
+.expert-login-account,
+.expert-login-outline {
+  display: flex;
+  width: 100%;
+  min-height: 68px;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  border: 1px solid #343434;
+  border-radius: 999px;
+  background: #000;
+  color: #fff;
+  font: 650 17px/1.2 Inter, ui-sans-serif, system-ui, sans-serif;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.expert-login-account {
+  justify-content: flex-start;
+  padding: 8px 18px;
+  border: 0;
+  background: #fff;
+  color: #111;
+  text-align: left;
+}
+.expert-login-account:disabled,
+.expert-login-outline:disabled {
+  cursor: wait;
+  opacity: .72;
+}
+.expert-login-avatar {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  flex: 0 0 56px;
+  place-items: center;
+  border-radius: 50%;
+  background: #d176b1;
+  color: #fff;
+  font-size: 19px;
+  font-weight: 600;
+}
+.expert-login-account-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 3px;
+}
+.expert-login-account-copy strong {
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.expert-login-account-copy small {
+  overflow: hidden;
+  color: #5d5d5d;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.expert-login-account-google {
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+}
+.expert-login-outline svg {
+  width: 27px;
+  height: 27px;
+  flex: 0 0 27px;
+}
+.expert-login-error {
+  margin: 0;
+  color: #ffb1b1;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: center;
+}
+@media (max-height: 720px) {
+  .expert-login-brand { top: 34%; }
+  .expert-login-actions { bottom: calc(16px + env(safe-area-inset-bottom)); gap: 10px; }
+  .expert-login-account, .expert-login-outline { min-height: 58px; }
+  .expert-login-avatar { width: 46px; height: 46px; flex-basis: 46px; }
+}
+
+
+/* Railway-hosted Expert AI account screen */
+.expert-login-screen { display:flex !important; flex-direction:column; align-items:center; justify-content:center; gap:26px; width:100%; min-height:100dvh; padding:max(24px,env(safe-area-inset-top)) 22px max(24px,env(safe-area-inset-bottom)); background:#090909; }
+.expert-login-screen .expert-login-brand { position:static !important; transform:none !important; margin:0; }
+.expert-login-form { display:grid; gap:12px; width:min(100%,420px); padding:26px; border:1px solid rgba(255,255,255,.09); border-radius:24px; background:#151515; }
+.expert-login-form h1 { margin:0; color:#fff; font-size:24px; font-weight:750; letter-spacing:-.035em; }
+.expert-login-form > p { margin:0 0 8px; color:#a9a9a9; font-size:14px; }
+.expert-login-form label { margin-top:5px; color:#dedede; font-size:13px; font-weight:650; }
+.expert-login-form input { width:100%; min-height:50px; padding:0 14px; border:1px solid #373737; border-radius:13px; outline:none; background:#0d0d0d; color:#fff; font:inherit; }
+.expert-login-form input:focus { border-color:#8585ff; box-shadow:0 0 0 3px rgba(115,110,255,.13); }
+.expert-login-submit { min-height:52px; margin-top:8px; border:0; border-radius:14px; background:#f5f5f5; color:#111; font-weight:750; cursor:pointer; }
+.expert-login-submit:disabled { opacity:.6; cursor:wait; }
+.expert-login-switch { min-height:42px; border:0; background:transparent; color:#c2c2ff; font-weight:650; cursor:pointer; }
+.expert-login-note { color:#898989; font-size:11px; line-height:1.5; text-align:center; }
