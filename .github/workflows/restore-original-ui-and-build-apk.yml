@@ -9,12 +9,14 @@ on:
       - "package.json"
       - "capacitor.config.json"
       - "src/App.tsx"
+      - "backend/railway/**"
+      - "public/mobile-ui-pack/**"
 
 permissions:
   contents: write
 
 concurrency:
-  group: expert-ai-android-${{ github.ref }}
+  group: expert-ai-android-\${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -22,10 +24,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - name: Check out Expert AI
+      - name: Check out migrated Expert AI source
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: \${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
       - name: Set up Node
@@ -39,7 +41,7 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Verify committed AppDeploy source assets
+      - name: Verify AppDeploy v24 UI and data-pack migration
         shell: bash
         run: |
           set -euo pipefail
@@ -53,52 +55,56 @@ jobs:
           test -s public/mobile-ui-pack/pack-live-features.js
           grep -q 'live-bridge.js' public/mobile-ui-pack/index.html
           ! test -e public/mobile-ui-pack/bootstrap.js
-          echo "Original AppDeploy UI, catalogue, artwork and Railway bridge are committed in GitHub; no AppDeploy download is required."
-      
+          test -s backend/railway/index.ts
+          echo "AppDeploy UI/data assets are local in this project; runtime no longer loads AppDeploy or its ZIP service."
+
       - name: Install JavaScript dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Build the web shell with the Railway API origin
+      - name: Build the web app with the Railway API
         env:
           VITE_EXPERT_API_ORIGIN: https://expert-ai-production-9e613662.up.railway.app
         run: npm run build
 
-      - name: Add Android platform
-        run: npx cap add android
+      - name: Add Android platform and sync assets
+        run: |
+          npx cap add android
+          npx cap sync android
 
-      - name: Sync Capacitor Android assets
-        run: npx cap sync android
-
-      - name: Set compatible Android SDK and fresh app identity
+      - name: Set compatible Android SDK and a fresh install identity
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
           import re
+
           variables = Path("android/variables.gradle")
           if variables.exists():
-              text = variables.read_text()
-              text, count = re.subn(r"minSdkVersion\\s*=\\s*\\d+", "minSdkVersion = 23", text, count=1)
-              if not count:
-                  raise SystemExit("Could not locate minSdkVersion in android/variables.gradle")
-              variables.write_text(text)
+              source = variables.read_text()
+              source, count = re.subn(r"minSdkVersion\s*=\s*\d+", "minSdkVersion = 23", source, count=1)
+              if count != 1:
+                  raise SystemExit("Could not update Android minimum SDK.")
+              variables.write_text(source)
+
           app = Path("android/app/build.gradle")
-          text = app.read_text()
-          text, c1 = re.subn(r"versionCode\\s+\\d+", "versionCode 2", text, count=1)
-          text, c2 = re.subn(r'versionName\\s+"[^"]+"', 'versionName "2.0.0"', text, count=1)
-          if not c1 or not c2:
-              raise SystemExit("Could not set Android versionCode/versionName")
-          app.write_text(text)
-          print("Application ID: ai.expertai.railway")
+          source = app.read_text()
+          source, code_count = re.subn(r"versionCode\s+\d+", "versionCode 2", source, count=1)
+          source, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "2.0.0"', source, count=1)
+          if code_count != 1 or name_count != 1:
+              raise SystemExit("Could not update Android app version metadata.")
+          app.write_text(source)
+          print("Application ID: ai.expertai.railway (from capacitor.config.json)")
           print("Version: 2.0.0 (code 2); minimum SDK: 23")
           PY
 
-      - name: Add Android permissions
+      - name: Add Android runtime permissions
         shell: bash
         run: |
+          set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
+
           path = Path("android/app/src/main/AndroidManifest.xml")
           source = path.read_text()
           required = (
@@ -108,33 +114,35 @@ jobs:
               "android.permission.POST_NOTIFICATIONS",
           )
           insertion = "".join(
-              f'    <uses-permission android:name="{permission}" />\\n'
+              f'    <uses-permission android:name="{permission}" />\n'
               for permission in required
               if f'android:name="{permission}"' not in source
           )
           if "android.hardware.microphone" not in source:
-              insertion += '    <uses-feature android:name="android.hardware.microphone" android:required="false" />\\n'
+              insertion += '    <uses-feature android:name="android.hardware.microphone" android:required="false" />\n'
           if insertion:
               source = source.replace("    <application", insertion + "    <application", 1)
           path.write_text(source)
           PY
 
-      - name: Build installable debug APK
+      - name: Build installable Android APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
 
-      - name: Verify APK package metadata and signature
+      - name: Verify APK identity, Android compatibility and signature
         working-directory: android
         shell: bash
         run: |
           set -euo pipefail
           APK="app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
-          "$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/aapt" dump badging "$APK" | head -n 3
-          "$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner" verify --verbose "$APK"
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          BADGING="$("$BUILD_TOOLS/aapt" dump badging "$APK")"
+          printf '%s\n' "$BADGING" | grep -E "^(package:|sdkVersion:|targetSdkVersion:)" | head -n 5
+          printf '%s\n' "$BADGING" | grep -q "name='ai.expertai.railway'"
+          "$BUILD_TOOLS/apksigner" verify --verbose "$APK"
 
-      - name: Report APK size
-        id: apk
+      - name: Report APK size and create release asset
         shell: bash
         run: |
           set -euo pipefail
@@ -144,18 +152,16 @@ jobs:
           MB=$(awk "BEGIN { printf \"%.2f\", $BYTES / 1048576 }")
           mkdir -p build-output
           cp "$APK" build-output/Expert-AI.apk
-          echo "size_mb=$MB" >> "$GITHUB_OUTPUT"
           {
             echo "## Expert AI Android APK"
             echo ""
-            echo "- APK size: **${MB} MB**"
-            echo "- Requested target: approximately 24 MB"
-            echo "- Build type: installable debug APK"
-          echo "- Android package: ai.expertai.railway"
-          echo "- Minimum Android version: API 23 (Android 6.0)
-"
-            echo "- UI source: original AppDeploy mobile UI archive, extracted into the app build (no runtime ZIP loader)"
-            echo "- API host: Railway"
+            echo "- APK size: **\${MB} MB**"
+            echo "- Package: **ai.expertai.railway**"
+            echo "- Android minimum: **6.0 (API 23)**"
+            echo "- Version: **2.0.0 (code 2)**"
+            echo "- Build: installable debug-signed APK"
+            echo "- Backend: Railway"
+            echo "- AppDeploy runtime and ZIP bootstrap: removed from the Android runtime"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload APK artifact
@@ -169,9 +175,9 @@ jobs:
       - name: Publish APK download release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: expert-ai-android-migrated-${{ github.run_number }}
-          name: Expert AI Android migrated build ${{ github.run_number }}
+          tag_name: expert-ai-android-migrated-\${{ github.run_number }}
+          name: Expert AI Android migrated build \${{ github.run_number }}
           prerelease: true
           files: build-output/Expert-AI.apk
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
