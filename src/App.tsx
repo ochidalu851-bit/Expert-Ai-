@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 
 const SESSION_KEY = 'expertAI:railwaySession';
+const API_ORIGIN = String(import.meta.env.VITE_EXPERT_API_ORIGIN || '').replace(/\/+$/, '');
+const apiUrl = (path: string) => /^https?:\/\//i.test(path) ? path : (API_ORIGIN + (path.startsWith('/') ? path : '/' + path));
 async function railwayRequest(path: string, method = 'GET', body?: unknown) {
   const headers = new Headers({ accept: 'application/json' });
   const token = localStorage.getItem(SESSION_KEY);
   if (token) headers.set('authorization', 'Bearer ' + token);
   if (body !== undefined) headers.set('content-type', 'application/json');
-  const response = await fetch(path, { method, headers, credentials: 'same-origin', body: body === undefined ? undefined : JSON.stringify(body) });
+  const response = await fetch(apiUrl(path), { method, headers, credentials: 'same-origin', body: body === undefined ? undefined : JSON.stringify(body) });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const reason = new Error(String(data?.error || 'The Expert AI service request failed.')) as Error & { status?: number };
@@ -236,7 +238,7 @@ function App() {
           case 'integrations.connect': {
             const provider = String(payload.provider || '');
             if (!['google', 'github', 'slack', 'notion'].includes(provider)) throw new Error('This provider does not support live OAuth in this app.');
-            const redirectUri = window.location.origin + '/api/oauth/' + provider + '/callback';
+            const redirectUri = apiUrl('/api/oauth/' + provider + '/callback');
             const result = (await api.post('/api/integrations/' + provider + '/start', { redirectUri })).data;
             const authorizationUrl = String(result.authorizationUrl || '');
             if (!authorizationUrl) throw new Error('The provider did not return an authorization URL.');
