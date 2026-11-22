@@ -82,7 +82,7 @@ jobs:
           variables = Path("android/variables.gradle")
           if variables.exists():
               source = variables.read_text()
-              source, count = re.subn(r"minSdkVersion\s*=\s*\d+", "minSdkVersion = 23", source, count=1)
+              source, count = re.subn(r"minSdkVersion\s*=\s*\d+", "minSdkVersion = 24", source, count=1)
               if count != 1:
                   raise SystemExit("Could not update Android minimum SDK.")
               variables.write_text(source)
@@ -95,7 +95,7 @@ jobs:
               raise SystemExit("Could not update Android app version metadata.")
           app.write_text(source)
           print("Application ID: ai.expertai.railway (from capacitor.config.json)")
-          print("Version: 2.0.0 (code 2); minimum SDK: 23")
+          print("Version: 2.0.0 (code 2); minimum SDK: 24")
           PY
 
       - name: Add Android runtime permissions
@@ -157,7 +157,7 @@ jobs:
             echo ""
             echo "- APK size: **\${MB} MB**"
             echo "- Package: **ai.expertai.railway**"
-            echo "- Android minimum: **6.0 (API 23)**"
+            echo "- Android minimum: **7.0 (API 24)**"
             echo "- Version: **2.0.0 (code 2)**"
             echo "- Build: installable debug-signed APK"
             echo "- Backend: Railway"
