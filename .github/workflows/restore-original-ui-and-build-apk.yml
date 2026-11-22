@@ -1,0 +1,180 @@
+name: Restore AppDeploy UI and build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/restore-original-ui-and-build-apk.yml"
+      - "package.json"
+      - "capacitor.config.json"
+      - "src/App.tsx"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: expert-ai-android-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  restore-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out Expert AI
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Restore the original AppDeploy mobile UI pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACK_URL="https://expert-ai-bwljhy.v2.appdeploy.ai/resources/user-upload.zip"
+          curl --fail --location --retry 3 --retry-delay 2 "$PACK_URL" -o /tmp/appdeploy-ui-pack.zip
+          echo "434712a94db824d9c975ee1f9fa650f330465996ad67481941979773d4b2ac24  /tmp/appdeploy-ui-pack.zip" | sha256sum --check
+          mkdir -p /tmp/appdeploy-ui-pack public/mobile-ui-pack
+          unzip -q /tmp/appdeploy-ui-pack.zip -d /tmp/appdeploy-ui-pack
+          test -f /tmp/appdeploy-ui-pack/ai_mobile_ui_pack/index.html
+          cp -a /tmp/appdeploy-ui-pack/ai_mobile_ui_pack/. public/mobile-ui-pack/
+
+          # The catalogue UI expects this global before catalogue-ui.js executes.
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const data = fs.readFileSync('public/mobile-ui-pack/activity_status_library.json', 'utf8');
+          JSON.parse(data);
+          fs.writeFileSync(
+            'public/mobile-ui-pack/activity-status-library.js',
+            'window.NEXA_ACTIVITY_STATUS_LIBRARY = ' + data + ';\\n'
+          );
+          const indexPath = 'public/mobile-ui-pack/index.html';
+          let html = fs.readFileSync(indexPath, 'utf8');
+          const catalogueTag = '<script src="catalogue-ui.js"></script>';
+          if (html.includes(catalogueTag) && !html.includes('activity-status-library.js')) {
+            html = html.replace(catalogueTag, '<script src="activity-status-library.js"></script>\\n  ' + catalogueTag);
+          }
+          const bridgeTag = '<script src="./live-bridge.js?v=railway-migration-v1"></script>';
+          if (!html.includes(bridgeTag)) {
+            html = html.replace('</body>', '  ' + bridgeTag + '\\n</body>');
+          }
+          fs.writeFileSync(indexPath, html);
+          NODE
+
+          # Remove the previous replacement loader and split-catalogue leftovers.
+          rm -f public/mobile-ui-pack/bootstrap.js
+          rm -f public/mobile-ui-pack/catalogue-part-1.json public/mobile-ui-pack/catalogue-part-2.json public/mobile-ui-pack/catalogue-part-3.json
+          rm -f public/mobile-ui-pack/capability-families.json public/mobile-ui-pack/activity-status-library.json
+
+      - name: Install JavaScript dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Commit restored source files back to GitHub
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/mobile-ui-pack package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Restore original AppDeploy Expert AI UI and assets"
+            git push origin HEAD:main
+          fi
+
+      - name: Build the web shell with the Railway API origin
+        env:
+          VITE_EXPERT_API_ORIGIN: https://expert-ai-production-9e613662.up.railway.app
+        run: npm run build
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Sync Capacitor Android assets
+        run: npx cap sync android
+
+      - name: Add Android permissions
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          path = Path("android/app/src/main/AndroidManifest.xml")
+          tree = ET.parse(path)
+          root = tree.getroot()
+          android = "{http://schemas.android.com/apk/res/android}"
+          existing = {
+              item.get(android + "name")
+              for item in root.findall("uses-permission")
+          }
+          for permission in (
+              "android.permission.INTERNET",
+              "android.permission.CAMERA",
+              "android.permission.RECORD_AUDIO",
+              "android.permission.POST_NOTIFICATIONS",
+          ):
+              if permission not in existing:
+                  node = ET.Element("uses-permission")
+                  node.set(android + "name", permission)
+                  root.insert(0, node)
+          feature = ET.Element("uses-feature")
+          feature.set(android + "name", "android.hardware.microphone")
+          feature.set(android + "required", "false")
+          root.insert(0, feature)
+          tree.write(path, encoding="utf-8", xml_declaration=True)
+          PY
+
+      - name: Build installable debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Report APK size
+        id: apk
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          BYTES=$(stat -c%s "$APK")
+          MB=$(awk "BEGIN { printf \"%.2f\", $BYTES / 1048576 }")
+          mkdir -p build-output
+          cp "$APK" build-output/Expert-AI.apk
+          echo "size_mb=$MB" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Expert AI Android APK"
+            echo ""
+            echo "- APK size: **${MB} MB**"
+            echo "- Requested target: approximately 24 MB"
+            echo "- Build type: installable debug APK"
+            echo "- UI source: original AppDeploy mobile UI archive, extracted into the app build (no runtime ZIP loader)"
+            echo "- API host: Railway"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Expert-AI-Android-APK
+          path: build-output/Expert-AI.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish APK download release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: expert-ai-android-${{ github.run_number }}
+          name: Expert AI Android build ${{ github.run_number }}
+          prerelease: true
+          files: build-output/Expert-AI.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
