@@ -1,13 +1,13 @@
 
-import postgres from "postgres@3.4.7";
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3@3.1169.0";
+import postgres from "postgres";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 const databaseUrl = Bun.env.DATABASE_URL || "";
 const openAiKey = Bun.env.OPENAI_API_KEY || "";
 const bucketName = Bun.env.S3_BUCKET || "";
 const bucketClient = new S3Client({
   region: Bun.env.S3_REGION || "auto",
   endpoint: Bun.env.S3_ENDPOINT || undefined,
-  forcePathStyle: false,
+  forcePathStyle: (Bun.env.S3_URL_STYLE || "virtual-host") === "path",
   credentials: {
     accessKeyId: Bun.env.S3_ACCESS_KEY_ID || "",
     secretAccessKey: Bun.env.S3_SECRET_ACCESS_KEY || ""
