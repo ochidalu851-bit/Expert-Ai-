@@ -110,31 +110,25 @@ jobs:
         shell: bash
         run: |
           python3 - <<'PY'
-          import xml.etree.ElementTree as ET
           from pathlib import Path
           path = Path("android/app/src/main/AndroidManifest.xml")
-          tree = ET.parse(path)
-          root = tree.getroot()
-          android = "{http://schemas.android.com/apk/res/android}"
-          existing = {
-              item.get(android + "name")
-              for item in root.findall("uses-permission")
-          }
-          for permission in (
+          source = path.read_text()
+          required = (
               "android.permission.INTERNET",
               "android.permission.CAMERA",
               "android.permission.RECORD_AUDIO",
               "android.permission.POST_NOTIFICATIONS",
-          ):
-              if permission not in existing:
-                  node = ET.Element("uses-permission")
-                  node.set(android + "name", permission)
-                  root.insert(0, node)
-          feature = ET.Element("uses-feature")
-          feature.set(android + "name", "android.hardware.microphone")
-          feature.set(android + "required", "false")
-          root.insert(0, feature)
-          tree.write(path, encoding="utf-8", xml_declaration=True)
+          )
+          insertion = "".join(
+              f'    <uses-permission android:name="{permission}" />\\n'
+              for permission in required
+              if f'android:name="{permission}"' not in source
+          )
+          if "android.hardware.microphone" not in source:
+              insertion += '    <uses-feature android:name="android.hardware.microphone" android:required="false" />\\n'
+          if insertion:
+              source = source.replace("    <application", insertion + "    <application", 1)
+          path.write_text(source)
           PY
 
       - name: Build installable debug APK
