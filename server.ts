@@ -1,6 +1,11 @@
-import apiModule from './backend/railway/index.ts';
+import apiModule, { cleanExpiredFiles } from './backend/railway/index.ts';
 
 const apiFetch = apiModule.fetch;
+
+// Preserve the AppDeploy hourly temporary-upload cleanup schedule on Railway.
+const runHourlyCleanup = () => cleanExpiredFiles().catch(error => console.error('Expert AI hourly file cleanup failed:', String(error)));
+void runHourlyCleanup();
+setInterval(runHourlyCleanup, 60 * 60 * 1000);
 const port = Number(Bun.env.PORT || 3000);
 
 async function serveStatic(request: Request, apiResponse: Response): Promise<Response> {
