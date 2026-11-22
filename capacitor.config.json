@@ -1,0 +1,11 @@
+{
+  "appId": "com.expertai.mobile",
+  "appName": "Expert AI",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}
