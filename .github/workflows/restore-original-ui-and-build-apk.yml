@@ -16,7 +16,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: expert-ai-android-\${{ github.ref }}
+  group: expert-ai-android-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -27,7 +27,7 @@ jobs:
       - name: Check out migrated Expert AI source
         uses: actions/checkout@v4
         with:
-          token: \${{ secrets.GITHUB_TOKEN }}
+          token: ${{ github.token }}
           fetch-depth: 0
 
       - name: Set up Node
@@ -175,9 +175,9 @@ jobs:
       - name: Publish APK download release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: expert-ai-android-migrated-\${{ github.run_number }}
-          name: Expert AI Android migrated build \${{ github.run_number }}
+          tag_name: expert-ai-android-migrated-${{ github.run_number }}
+          name: Expert AI Android migrated build ${{ github.run_number }}
           prerelease: true
           files: build-output/Expert-AI.apk
         env:
-          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
