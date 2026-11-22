@@ -419,7 +419,7 @@ async function loadAttachmentBlocks(userId: string, ids: string[]) {
   }
   return blocks;
 }
-async function cleanExpiredFiles() {
+export async function cleanExpiredFiles() {
   const rows = await sql!.unsafe("SELECT id,object_key FROM expert_ai_files WHERE is_temporary=true AND expires_at<=now() LIMIT 30");
   for (const row of rows) {
     try { await deleteStoredFile(row); } catch (error) { console.error("Temporary file cleanup failed", String(error)); }
