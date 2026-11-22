@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#090909" />
+    <meta name="description" content="Expert AI — your live AI workspace." />
+    <meta name="application-name" content="Expert AI" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Expert AI" />
+    <link rel="icon" href="/expert-ai-icon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>Expert AI</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          const hadController = Boolean(navigator.serviceWorker.controller);
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (hadController && !window.__expertReloadedForUpdate) {
+              window.__expertReloadedForUpdate = true;
+              window.location.reload();
+            }
+          }, { once: true });
+          navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(registration => {
+            registration.update().catch(() => {});
+          }).catch(() => {});
+        });
+      }
+    </script>
+  </body>
+</html>
