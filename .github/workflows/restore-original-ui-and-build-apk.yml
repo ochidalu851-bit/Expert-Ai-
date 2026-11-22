@@ -39,61 +39,24 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Restore the original AppDeploy mobile UI pack
+      - name: Verify committed AppDeploy source assets
         shell: bash
         run: |
           set -euo pipefail
-          PACK_URL="https://expert-ai-bwljhy.v2.appdeploy.ai/resources/user-upload.zip"
-          curl --fail --location --retry 3 --retry-delay 2 "$PACK_URL" -o /tmp/appdeploy-ui-pack.zip
-          echo "434712a94db824d9c975ee1f9fa650f330465996ad67481941979773d4b2ac24  /tmp/appdeploy-ui-pack.zip" | sha256sum --check
-          mkdir -p /tmp/appdeploy-ui-pack public/mobile-ui-pack
-          unzip -q /tmp/appdeploy-ui-pack.zip -d /tmp/appdeploy-ui-pack
-          test -f /tmp/appdeploy-ui-pack/ai_mobile_ui_pack/index.html
-          cp -a /tmp/appdeploy-ui-pack/ai_mobile_ui_pack/. public/mobile-ui-pack/
-
-          # The catalogue UI expects this global before catalogue-ui.js executes.
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          const data = fs.readFileSync('public/mobile-ui-pack/activity_status_library.json', 'utf8');
-          JSON.parse(data);
-          fs.writeFileSync(
-            'public/mobile-ui-pack/activity-status-library.js',
-            'window.NEXA_ACTIVITY_STATUS_LIBRARY = ' + data + ';\n'
-          );
-          const indexPath = 'public/mobile-ui-pack/index.html';
-          let html = fs.readFileSync(indexPath, 'utf8');
-          const catalogueTag = '<script src="catalogue-ui.js"></script>';
-          if (html.includes(catalogueTag) && !html.includes('activity-status-library.js')) {
-            html = html.replace(catalogueTag, '<script src="activity-status-library.js"></script>\n  ' + catalogueTag);
-          }
-          const bridgeTag = '<script src="./live-bridge.js?v=railway-migration-v1"></script>';
-          if (!html.includes(bridgeTag)) {
-            html = html.replace('</body>', '  ' + bridgeTag + '\n</body>');
-          }
-          fs.writeFileSync(indexPath, html);
-          NODE
-
-          # Remove the previous replacement loader and split-catalogue leftovers.
-          rm -f public/mobile-ui-pack/bootstrap.js
-          rm -f public/mobile-ui-pack/catalogue-part-1.json public/mobile-ui-pack/catalogue-part-2.json public/mobile-ui-pack/catalogue-part-3.json
-          rm -f public/mobile-ui-pack/capability-families.json public/mobile-ui-pack/activity-status-library.json
-
+          test -s public/mobile-ui-pack/index.html
+          test -s public/mobile-ui-pack/styles.css
+          test -s public/mobile-ui-pack/app.js
+          test -s public/mobile-ui-pack/plugin_catalogue.js
+          test -s public/mobile-ui-pack/activity_status_library.json
+          test -s public/mobile-ui-pack/activity-status-library.js
+          test -s public/mobile-ui-pack/live-bridge.js
+          test -s public/mobile-ui-pack/pack-live-features.js
+          grep -q 'live-bridge.js' public/mobile-ui-pack/index.html
+          ! test -e public/mobile-ui-pack/bootstrap.js
+          echo "Original AppDeploy UI, catalogue, artwork and Railway bridge are committed in GitHub; no AppDeploy download is required."
+      
       - name: Install JavaScript dependencies
-        run: npm install --no-audit --no-fund
-
-      - name: Commit restored source files back to GitHub
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/mobile-ui-pack package-lock.json
-          if ! git diff --cached --quiet; then
-            git commit -m "Restore original AppDeploy Expert AI UI and assets"
-            git fetch origin main
-            git rebase origin/main
-            git push origin HEAD:main
-          fi
+        run: npm ci --no-audit --no-fund
 
       - name: Build the web shell with the Railway API origin
         env:
