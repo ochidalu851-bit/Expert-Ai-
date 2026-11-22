@@ -90,6 +90,8 @@ jobs:
           git add public/mobile-ui-pack package-lock.json
           if ! git diff --cached --quiet; then
             git commit -m "Restore original AppDeploy Expert AI UI and assets"
+            git fetch origin main
+            git rebase origin/main
             git push origin HEAD:main
           fi
 
