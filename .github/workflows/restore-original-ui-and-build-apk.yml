@@ -1,4 +1,4 @@
-name: Restore AppDeploy UI and build Android APK
+name: Expert AI Railway migration Android build
 
 on:
   workflow_dispatch:
@@ -69,6 +69,31 @@ jobs:
       - name: Sync Capacitor Android assets
         run: npx cap sync android
 
+      - name: Set compatible Android SDK and fresh app identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          variables = Path("android/variables.gradle")
+          if variables.exists():
+              text = variables.read_text()
+              text, count = re.subn(r"minSdkVersion\\s*=\\s*\\d+", "minSdkVersion = 23", text, count=1)
+              if not count:
+                  raise SystemExit("Could not locate minSdkVersion in android/variables.gradle")
+              variables.write_text(text)
+          app = Path("android/app/build.gradle")
+          text = app.read_text()
+          text, c1 = re.subn(r"versionCode\\s+\\d+", "versionCode 2", text, count=1)
+          text, c2 = re.subn(r'versionName\\s+"[^"]+"', 'versionName "2.0.0"', text, count=1)
+          if not c1 or not c2:
+              raise SystemExit("Could not set Android versionCode/versionName")
+          app.write_text(text)
+          print("Application ID: ai.expertai.railway")
+          print("Version: 2.0.0 (code 2); minimum SDK: 23")
+          PY
+
       - name: Add Android permissions
         shell: bash
         run: |
@@ -98,6 +123,16 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
 
+      - name: Verify APK package metadata and signature
+        working-directory: android
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/aapt" dump badging "$APK" | head -n 3
+          "$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner" verify --verbose "$APK"
+
       - name: Report APK size
         id: apk
         shell: bash
@@ -116,6 +151,9 @@ jobs:
             echo "- APK size: **${MB} MB**"
             echo "- Requested target: approximately 24 MB"
             echo "- Build type: installable debug APK"
+          echo "- Android package: ai.expertai.railway"
+          echo "- Minimum Android version: API 23 (Android 6.0)
+"
             echo "- UI source: original AppDeploy mobile UI archive, extracted into the app build (no runtime ZIP loader)"
             echo "- API host: Railway"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -131,8 +169,8 @@ jobs:
       - name: Publish APK download release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: expert-ai-android-${{ github.run_number }}
-          name: Expert AI Android build ${{ github.run_number }}
+          tag_name: expert-ai-android-migrated-${{ github.run_number }}
+          name: Expert AI Android migrated build ${{ github.run_number }}
           prerelease: true
           files: build-output/Expert-AI.apk
         env:
