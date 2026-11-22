@@ -58,17 +58,17 @@ jobs:
           JSON.parse(data);
           fs.writeFileSync(
             'public/mobile-ui-pack/activity-status-library.js',
-            'window.NEXA_ACTIVITY_STATUS_LIBRARY = ' + data + ';\\n'
+            'window.NEXA_ACTIVITY_STATUS_LIBRARY = ' + data + ';\n'
           );
           const indexPath = 'public/mobile-ui-pack/index.html';
           let html = fs.readFileSync(indexPath, 'utf8');
           const catalogueTag = '<script src="catalogue-ui.js"></script>';
           if (html.includes(catalogueTag) && !html.includes('activity-status-library.js')) {
-            html = html.replace(catalogueTag, '<script src="activity-status-library.js"></script>\\n  ' + catalogueTag);
+            html = html.replace(catalogueTag, '<script src="activity-status-library.js"></script>\n  ' + catalogueTag);
           }
           const bridgeTag = '<script src="./live-bridge.js?v=railway-migration-v1"></script>';
           if (!html.includes(bridgeTag)) {
-            html = html.replace('</body>', '  ' + bridgeTag + '\\n</body>');
+            html = html.replace('</body>', '  ' + bridgeTag + '\n</body>');
           }
           fs.writeFileSync(indexPath, html);
           NODE
