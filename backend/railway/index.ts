@@ -37,6 +37,7 @@ async function initDatabase() {
   await sql.unsafe("CREATE INDEX IF NOT EXISTS expert_ai_oauth_states_expiry_idx ON expert_ai_oauth_states(expires_at)");
   await sql.unsafe("CREATE TABLE IF NOT EXISTS expert_ai_integrations (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES expert_ai_users(id) ON DELETE CASCADE, provider text NOT NULL CHECK (provider IN ('google','github','slack','notion')), provider_account_id text, account_email text, workspace_name text, access_token_enc text NOT NULL, refresh_token_enc text, token_type text, scopes text NOT NULL DEFAULT '', expires_at timestamptz, metadata jsonb NOT NULL DEFAULT '{}'::jsonb, connected_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), UNIQUE(user_id, provider))");
   await sql.unsafe("CREATE INDEX IF NOT EXISTS expert_ai_integrations_user_idx ON expert_ai_integrations(user_id, provider)");
+  await sql.unsafe("CREATE TABLE IF NOT EXISTS expert_ai_migration_runs (id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES expert_ai_users(id) ON DELETE CASCADE, source_user_id text NOT NULL, status text NOT NULL DEFAULT 'running', created_at timestamptz NOT NULL DEFAULT now(), finished_at timestamptz)");
   dbReady = true;
 }
 try { await initDatabase(); } catch (error) { console.error("Database initialization failed", String(error)); }
@@ -494,6 +495,103 @@ async function handler(request: Request) {
       console.error("OAuth callback failed",oauthCallbackMatch[1],String(error).slice(0,220));
       return integrationReturnUrl(oauthCallbackMatch[1],false,"The connection could not be completed. Check provider settings and try again.");
     }
+  }
+  if (url.pathname === "/api/migration/import" && request.method === "POST") {
+    const expected = Bun.env.APPDEPLOY_MIGRATION_TOKEN || "";
+    const supplied = request.headers.get("x-appdeploy-migration-token") || "";
+    if (!expected || supplied.length !== expected.length || !equal(supplied, expected)) return json({ error: "Migration authorization failed." }, 401, origin);
+    if (!sql || !dbReady) return json({ error: "Database is not ready." }, 503, origin);
+    const body = await parseBody(request);
+    const action = String(body.action || "");
+    if (action === "begin") {
+      const email = String(body.email || "").trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return json({ error: "A valid account email is required." }, 400, origin);
+      let rows = await sql.unsafe("SELECT id,email FROM expert_ai_users WHERE email=$1 LIMIT 1", [email]);
+      let temporaryPassword = "";
+      let accountCreated = false;
+      if (!rows.length) {
+        temporaryPassword = randomHex(16);
+        const salt = randomHex(16);
+        const hash = await passwordHash(temporaryPassword, salt);
+        rows = await sql.unsafe("INSERT INTO expert_ai_users(email,password_hash,password_salt) VALUES($1,$2,$3) RETURNING id,email", [email,hash,salt]);
+        accountCreated = true;
+      }
+      const user = rows[0];
+      const accessToken = await createSession(user.id);
+      const migrationId = crypto.randomUUID();
+      await sql.unsafe("INSERT INTO expert_ai_migration_runs(id,user_id,source_user_id,status) VALUES($1,$2,$3,'running')", [migrationId,user.id,String(body.sourceUserId || "appdeploy").slice(0,160)]);
+      return json({ ok:true, migrationId, accessToken, user:{id:user.id,email:user.email}, accountCreated, temporaryPassword }, 200, origin);
+    }
+    const authorization = request.headers.get("authorization") || "";
+    const sessionRequest = new Request(request.url, { method:"GET", headers:{ authorization } });
+    const user = await currentUser(sessionRequest);
+    if (!user) return json({ error:"The Railway migration session is no longer valid." },401,origin);
+    const migrationId = String(body.migrationId || "");
+    const active = await sql.unsafe("SELECT id FROM expert_ai_migration_runs WHERE id=$1 AND user_id=$2 AND status='running' LIMIT 1", [migrationId,user.id]);
+    if (!active.length) return json({ error:"This migration session is missing or already finished." },409,origin);
+    if (action === "records") {
+      const kind = String(body.kind || "");
+      const records = Array.isArray(body.records) ? body.records.slice(0,30) : [];
+      let imported = 0, skipped = 0;
+      if (kind === "chats") {
+        for (const item of records) {
+          const id = /^[0-9a-f-]{36}$/i.test(String(item?.id || "")) ? String(item.id) : crypto.randomUUID();
+          const exists = await sql.unsafe("SELECT id FROM expert_ai_chats WHERE id=$1 LIMIT 1",[id]);
+          if (exists.length) { skipped++; continue; }
+          const created = item.created_at ? new Date(item.created_at) : new Date();
+          const updated = item.updated_at ? new Date(item.updated_at) : created;
+          const messages = Array.isArray(item.messages) ? item.messages : [];
+          await sql.unsafe("INSERT INTO expert_ai_chats(id,user_id,title,messages,created_at,updated_at) VALUES($1,$2,$3,$4::jsonb,$5,$6)",[id,user.id,String(item.title || "Imported conversation").slice(0,120),JSON.stringify(messages),created,updated]);
+          imported++;
+        }
+      } else if (kind === "projects") {
+        for (const item of records) {
+          const id = /^[0-9a-f-]{36}$/i.test(String(item?.id || "")) ? String(item.id) : crypto.randomUUID();
+          const exists = await sql.unsafe("SELECT id FROM expert_ai_projects WHERE id=$1 LIMIT 1",[id]);
+          if (exists.length) { skipped++; continue; }
+          const created = item.created_at ? new Date(item.created_at) : new Date();
+          const updated = item.updated_at ? new Date(item.updated_at) : created;
+          await sql.unsafe("INSERT INTO expert_ai_projects(id,user_id,name,description,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6)",[id,user.id,String(item.name || "Imported project").slice(0,160),String(item.description || "").slice(0,4000),created,updated]);
+          imported++;
+        }
+      } else if (kind === "connections") {
+        for (const item of records) {
+          const provider = String(item.provider || "");
+          if (!["google","github","slack","notion"].includes(provider) || !item.access_token) { skipped++; continue; }
+          const access = await encryptIntegrationSecret(String(item.access_token));
+          const refresh = item.refresh_token ? await encryptIntegrationSecret(String(item.refresh_token)) : null;
+          const expires = item.expires_at ? new Date(item.expires_at) : null;
+          await sql.unsafe("INSERT INTO expert_ai_integrations(user_id,provider,access_token_enc,refresh_token_enc,token_type,scopes,expires_at,metadata,connected_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,now(),now()) ON CONFLICT(user_id,provider) DO NOTHING",[user.id,provider,access,refresh,item.token_type || null,String(item.scope || item.scopes || "").slice(0,2000),expires,JSON.stringify({ migrated_from:"AppDeploy", account_email:String(item.account_email || "") })]);
+          imported++;
+        }
+      } else return json({error:"Unknown migration record category."},400,origin);
+      return json({ok:true,kind,imported,skipped},200,origin);
+    }
+    if (action === "file") {
+      const name = String(body.name || "imported-file.bin").replace(/[\\/\0]/g,"_").slice(0,180);
+      const encoded = String(body.contentBase64 || "");
+      if (!encoded || encoded.length > 6 * 1024 * 1024) return json({error:"File data is missing or exceeds the 4 MB transfer limit."},413,origin);
+      const bytes = Buffer.from(encoded,"base64");
+      if (!bytes.length || bytes.length > 4 * 1024 * 1024) return json({error:"The transferred file is invalid or exceeds 4 MB."},413,origin);
+      if (!bucketName) return json({error:"Railway object storage is not configured."},503,origin);
+      const id = /^[0-9a-f-]{36}$/i.test(String(body.id || "")) ? String(body.id) : crypto.randomUUID();
+      const exists = await sql.unsafe("SELECT id FROM expert_ai_files WHERE id=$1 LIMIT 1",[id]);
+      if (exists.length) return json({ok:true,skipped:true,id},200,origin);
+      const safeName = name.replace(/[\r\n"]/g,"_");
+      const objectKey = "users/" + user.id + "/" + id + "/" + safeName;
+      await bucketClient.send(new PutObjectCommand({Bucket:bucketName,Key:objectKey,Body:bytes,ContentType:String(body.contentType || "application/octet-stream").slice(0,160)}));
+      const created = body.created_at ? new Date(body.created_at) : new Date();
+      await sql.unsafe("INSERT INTO expert_ai_files(id,user_id,name,content_type,size,object_key,is_temporary,expires_at,created_at) VALUES($1,$2,$3,$4,$5,$6,false,NULL,$7)",[id,user.id,safeName,String(body.contentType || "application/octet-stream").slice(0,160),bytes.length,objectKey,created]);
+      return json({ok:true,id,objectKey,originalPath:String(body.path || "")},200,origin);
+    }
+    if (action === "finish") {
+      const preferences = body.preferences && typeof body.preferences === "object" && !Array.isArray(body.preferences) ? body.preferences : {};
+      await sql.unsafe("INSERT INTO expert_ai_preferences(user_id,preferences) VALUES($1,$2::jsonb) ON CONFLICT(user_id) DO UPDATE SET preferences=expert_ai_preferences.preferences || EXCLUDED.preferences,updated_at=now()",[user.id,JSON.stringify(preferences)]);
+      await sql.unsafe("UPDATE expert_ai_migration_runs SET status='complete',finished_at=now() WHERE id=$1 AND user_id=$2",[migrationId,user.id]);
+      const counts = await sql.unsafe("SELECT (SELECT count(*) FROM expert_ai_chats WHERE user_id=$1) AS chats,(SELECT count(*) FROM expert_ai_projects WHERE user_id=$1) AS projects,(SELECT count(*) FROM expert_ai_files WHERE user_id=$1) AS files,(SELECT count(*) FROM expert_ai_integrations WHERE user_id=$1) AS connections",[user.id]);
+      return json({ok:true,counts:counts[0]},200,origin);
+    }
+    return json({error:"Unknown migration action."},400,origin);
   }
   if (url.pathname.startsWith("/api/")) {
     if (!sql || !dbReady) return json({ error: "Database is not ready." }, 503, origin);
