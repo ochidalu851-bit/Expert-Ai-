@@ -2,13 +2,12 @@
 (() => {
   'use strict';
   const C = window.NEXA_PLUGIN_CATALOGUE || {records:[],families:[],snapshots:[]};
-  const A = window.NEXA_ACTIVITY_STATUS_LIBRARY || {statuses:[],count:0};
   const $cat = (s, root=document) => root.querySelector(s);
   const escCat = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const famById = Object.fromEntries((C.families||[]).map(f=>[f.id,f]));
   const cats = (C.categories||[]).map(c=>c.name);
   const all = C.records || [];
-  let catLimit=40, activityLimit=60;
+  let catLimit=40;
   const fmt = n => Number(n||0).toLocaleString();
   const recordName = r => r.name || 'Name not supplied / not verified';
   const recordPublisher = r => r.publisherName || 'Publisher not supplied / not verified';
@@ -71,7 +70,7 @@
       <div class="nx-filter-grid">${select('nxFamilyFilter','Capability family',famOptions)}${select('nxCategoryFilter','Source category',catOptions)}${select('nxKindFilter','Listing type',kindOptions)}${select('nxSnapshotFilter','Source snapshot',snapOptions)}${select('nxStateFilter','Catalogue / connection state',stateOptions)}</div>
       <div class="nx-countline" id="nxCatalogueCount">${fmt(all.length)} matches · ${fmt(all.length)} unique records</div>
       <div id="nxCatalogueResults" class="nx-results">${resultsHtml(all)}</div>
-      <div class="nx-section-links"><button class="outline" data-page="capabilityFamilies">12 capability families</button><button class="outline" data-page="activityStatusLibrary">422 activity statuses</button><button class="outline" data-page="catalogueProvenance">Import provenance</button></div>
+      <div class="nx-section-links"><button class="outline" data-page="capabilityFamilies">12 capability families</button><button class="outline" data-page="catalogueProvenance">Import provenance</button></div>
       <p class="nx-smallnote">Official identity, publisher, icon and short description are shown only when supplied in the source export. Family mappings are Nexa inferences. Tool definitions, API endpoints, permissions and authentication details are not supplied by these PDFs.</p>`;
   }
   function detailPage() {
@@ -104,26 +103,6 @@
     }).join('');
     return `<div class="nx-intro"><div class="nx-eyebrow">NEXA AI FRAMEWORK</div><h2>12 capability families</h2><p>These are the capability families requested for Nexa AI. Record counts overlap because one listing may map to several families.</p></div><div class="nx-family-grid">${cards}</div><button class="outline" data-page="pluginCatalogue">Search catalogue</button>`;
   }
-  function activitiesPage() {
-    activityLimit=60;
-    return `<div class="nx-intro"><div class="nx-eyebrow">USER-VISIBLE TASK MILESTONES</div><h2>Activity & progress status library</h2><p>${fmt(A.count)} messages mapped to a capability family or cross-family workflow. These describe task milestones, tool activity and results—not private chain-of-thought.</p></div>
-      <div class="nx-warning"><b>Draft status vocabulary</b><p>The original previously referenced 422-item wording was not included in the uploaded archive and was not located in the available file library. This is a newly drafted 422-item substitute: 34 milestones per family plus 14 cross-family states.</p></div>
-      <div class="nx-searchbox"><span>⌕</span><input id="nxActivitySearch" placeholder="Search status message, workflow or capability"></div>
-      ${select('nxActivityFamily','Capability family',[{value:'',label:'All families'},...(C.families||[]).map(f=>({value:f.id,label:f.name})),{value:'cross-family',label:'Cross-family statuses'}])}
-      <div class="nx-countline" id="nxActivityCount">${fmt(A.count)} statuses</div><div id="nxActivityResults" class="nx-status-list">${activityResultsHtml(A.statuses||[])}</div>`;
-  }
-  function activityResultsHtml(items) {
-    const q=($cat('#nxActivitySearch')?.value||'').trim().toLowerCase();
-    const f=$cat('#nxActivityFamily')?.value||'';
-    const filtered=items.filter(x=>(!f||x.familyId===f)&&(!q||`${x.message} ${x.capability} ${x.workflow} ${x.stage}`.toLowerCase().includes(q)));
-    const shown=filtered.slice(0,activityLimit);
-    return `${shown.map(x=>`<div class="nx-status-item"><div><b>${escCat(x.message)}</b><span>${escCat(x.workflow)} · ${escCat(x.capability)}</span></div>${chip(x.stage,'nx-muted')}<small>${escCat(x.toolStatus)} · ${escCat(x.visibility)}</small></div>`).join('')||'<div class="nx-empty">No matching status messages.</div>'}${filtered.length>shown.length?`<button class="outline nx-more" data-action="loadActivityMore">Show next 60 (${fmt(filtered.length-shown.length)} remaining)</button>`:''}`;
-  }
-  function updateActivityResults(reset=false) {
-    if(reset) activityLimit=60;
-    const el=$cat('#nxActivityResults'); if(el) el.innerHTML=activityResultsHtml(A.statuses||[]);
-    const count=$cat('#nxActivityCount'); if(count){const q=($cat('#nxActivitySearch')?.value||'').toLowerCase();const f=$cat('#nxActivityFamily')?.value||'';const n=(A.statuses||[]).filter(x=>(!f||x.familyId===f)&&(!q||`${x.message} ${x.capability} ${x.workflow} ${x.stage}`.toLowerCase().includes(q))).length;count.textContent=`${fmt(n)} statuses`;}
-  }
   function provenancePage() {
     const rows=(C.snapshots||[]).map(s=>`<div class="nx-snapshot-row"><b>${escCat(s.snapshotDate)} · page ${s.apiPageNumber} of ${s.pagesInSnapshotAccordingToHeader}</b><span>Header count ${fmt(s.snapshotHeaderCount)} · supplied rows ${fmt(s.recordsInSuppliedPdfPart)} · ranks ${s.rankCoverage?.[0]}–${s.rankCoverage?.[1]}</span><span>${escCat(s.pdfFilename)}</span><span>Source: ${escCat(s.sourceName)} · ${escCat(s.sourceParameter)} · ${escCat(s.metric)}</span><span>URL: ${escCat(s.sourceUrl)} (${escCat(s.sourceUrlStatus)})</span><span>${fmt(s.partialExtractions)} partial extractions · ${fmt(s.missingNames)} missing names</span></div>`).join('');
     return `<div class="nx-intro"><div class="nx-eyebrow">DATA QUALITY & PROVENANCE</div><h2>Import provenance</h2><p>Every listing retains source filename, source name, inferred source URL, snapshot date, page number, header count and supplied coverage count.</p></div>
@@ -135,18 +114,17 @@
   }
 
   // New pages are registered after the original interface code has loaded.
-  Object.assign(pageTitles,{pluginCatalogue:'Plugin catalogue',catalogueDetail:'App details',capabilityFamilies:'Capability families',activityStatusLibrary:'Activity and progress',catalogueProvenance:'Import provenance'});
+  Object.assign(pageTitles,{pluginCatalogue:'Plugin catalogue',catalogueDetail:'App details',capabilityFamilies:'Capability families',catalogueProvenance:'Import provenance'});
   pages.pluginCatalogue=cataloguePage;
   pages.catalogueDetail=detailPage;
   pages.capabilityFamilies=familiesPage;
-  pages.activityStatusLibrary=activitiesPage;
   pages.catalogueProvenance=provenancePage;
   pages.plugins=function(){
     const counts=all.reduce((o,r)=>(o[r.listingKind||'not supplied']=(o[r.listingKind||'not supplied']||0)+1,o),{});
     const connectors=counts.connector||0, apps=counts.app||0, plugins=counts.plugin||0;
     return `<div class="nx-intro nx-plugin-entry"><div class="nx-eyebrow">NEXA AI</div><h2>Apps & plugins</h2><p>Browse source-listed apps, plugins and connectors. Catalogue entries are not automatically installed or connected.</p><div class="nx-statline"><b>${fmt(all.length)}</b><span>unique records</span><b>${fmt(apps)}</b><span>apps</span><b>${fmt(plugins)}</b><span>plugins</span><b>${fmt(connectors)}</b><span>connectors</span></div></div>
       <button class="nx-feature-link" data-page="pluginCatalogue"><span>⌕</span><b>Search complete plugin catalogue</b><small>Search by name, publisher, category, capability or description</small><i>›</i></button>
-      <div class="nx-section-links"><button class="outline" data-page="capabilityFamilies">12 capability families</button><button class="outline" data-page="activityStatusLibrary">422 activity statuses</button></div>
+      <div class="nx-section-links"><button class="outline" data-page="capabilityFamilies">12 capability families</button></div>
       ${section('Existing demo integrations')}${group(row('Popular apps and plugin previews','newNoteworthy','✦','Examples from the supplied screen recording'))}
       <p class="nx-smallnote">The previous small demo list is retained as a UI preview. It is separate from the imported 12,618-record MCPTOP catalogue.</p>`;
   };
@@ -157,8 +135,6 @@
       prefs.activePluginRecordId=element?.dataset?.recordId||''; save(); nav('catalogueDetail');
     } else if(action==='loadCatalogueMore'){
       catLimit+=40; updateCatalogueResults(false);
-    } else if(action==='loadActivityMore'){
-      activityLimit+=60; updateActivityResults(false);
     } else if(action==='filterByFamily'){
       const fid=element?.dataset?.family||''; prefs.catalogueInitialFamily=fid; nav('pluginCatalogue');
     } else baseCatalogueHandle(action,element);
@@ -178,11 +154,9 @@
 
   screen.addEventListener('input',e=>{
     if(e.target?.id==='nxCatalogueSearch') updateCatalogueResults(true);
-    if(e.target?.id==='nxActivitySearch') updateActivityResults(true);
   });
   screen.addEventListener('change',e=>{
     if(['nxFamilyFilter','nxCategoryFilter','nxKindFilter','nxSnapshotFilter','nxStateFilter'].includes(e.target?.id)) updateCatalogueResults(true);
-    if(e.target?.id==='nxActivityFamily') updateActivityResults(true);
   });
   window.addEventListener('error',e=>{
     const img=e.target;
