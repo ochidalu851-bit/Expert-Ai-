@@ -887,7 +887,7 @@
     }
   };
   const expertEnhancements = document.createElement('script');
-  expertEnhancements.src = '/mobile-ui-pack/expert-ai-upgrades.js?v=3';
+  expertEnhancements.src = '/mobile-ui-pack/expert-ai-upgrades.js?v=4-composer';
   expertEnhancements.onload = () => {
     const messageActions = document.createElement('script');
     messageActions.src = '/mobile-ui-pack/message-actions.js?v=5';

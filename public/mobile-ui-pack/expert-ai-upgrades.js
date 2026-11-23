@@ -171,13 +171,32 @@
       esc(item.status || 'Waiting to send…') + '</div>').join('');
     return activity + pending;
   };
+
+  /* High-visibility composer controls: recorder, live voice chat and send. */
+  const composerMicIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"></path></svg>';
+  const composerVoiceIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4M7 7v10M11 4v16M15 7v10M19 10v4M22 11v2"></path></svg>';
+  const composerSendIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"></path></svg>';
+  function emphasizeComposerControls(html) {
+    html = html.replace(/<button\b(?=[^>]*data-action="voiceInput")[^>]*>[\s\S]*?<\/button>/i,
+      '<button type="button" class="expert-composer-control expert-voice-recognition" data-action="voiceInput" aria-label="Voice recognition" title="Start voice recognition">' + composerMicIcon + '</button>');
+    html = html.replace(/<button\b(?=[^>]*data-page="(?:voiceMode|expertVoiceChat)")[^>]*>[\s\S]*?<\/button>/i,
+      '<button type="button" class="expert-composer-control expert-voice-chat" data-page="expertVoiceChat" aria-label="Voice chat" title="Start voice chat">' + composerVoiceIcon + '</button>');
+    html = html.replace(/<button\b[^>]*class="[^"]*\bsend-button\b[^"]*"[^>]*>[\s\S]*?<\/button>/i, button => {
+      let updated = button.replace(/class="([^"]*)"/i, (_, classes) => 'class="' + classes + ' expert-send-button"');
+      updated = updated.replace(/aria-label="[^"]*"/i, 'aria-label="Send message"');
+      updated = updated.replace(/title="[^"]*"/i, 'title="Send message"');
+      return updated.replace(/>[\s\S]*<\/button>$/i, '>' + composerSendIcon + '</button>');
+    });
+    return html;
+  }
+
   saveOriginal('chat');
   pages.chat = function() {
     let html = originalPages.chat();
     html = html.replace(/(<button[^>]*data-action="voiceInput"[^>]*>[\s\S]*?<\/button>)/i, thinkButton() + '$1');
     html = html.replace(/data-page="voiceMode"/g, 'data-page="expertVoiceChat"');
     html = html.replace(/<div class="chat-composer([^"]*)">/, recordingMarkup() + '<div class="chat-composer$1 expert-fixed-composer">');
-    return html;
+    return emphasizeComposerControls(html);
   };
   saveOriginal('home');
   const brandedHome = pages.home;
@@ -186,7 +205,7 @@
     html = html.replace(/(<button[^>]*data-action="voiceInput"[^>]*>[\s\S]*?<\/button>)/i, thinkButton() + '$1');
     html = html.replace(/data-page="voiceMode"/g, 'data-page="expertVoiceChat"');
     html = html.replace(/<div class="chat-composer/, recordingMarkup() + '<div class="chat-composer');
-    return html;
+    return emphasizeComposerControls(html);
   };
 
   const style = document.createElement('style');
@@ -230,6 +249,20 @@
     '.expert-voice-shell{display:flex;min-height:68vh;flex-direction:column;align-items:center;justify-content:center;gap:24px}.expert-voice-orb{width:180px;height:180px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#b9eaff,#4e7dff 42%,#4e32a8 75%);box-shadow:0 0 0 15px rgba(91,131,255,.08),0 0 65px rgba(91,131,255,.28);animation:expertOrb 3s ease-in-out infinite}.expert-voice-orb.is-speaking{animation:expertOrb .75s ease-in-out infinite}@keyframes expertOrb{50%{transform:scale(1.08);filter:brightness(1.2)}}',
     '.expert-plugin-topline{display:flex;align-items:center;justify-content:space-between;margin:4px 0 18px;font-weight:700}.expert-plugin-topline button{width:42px;height:42px;border-radius:50%;background:#303030;color:#fff;border:0;font-size:21px}.expert-plugin-hero{display:flex;align-items:center;gap:15px;margin:14px 0 24px}.expert-plugin-hero img,.expert-plugin-icon{width:76px;height:76px;border-radius:18px;object-fit:contain;background:#147c72;padding:12px}.expert-plugin-icon{display:grid;place-items:center;color:#fff;font-size:30px;font-weight:800}.expert-plugin-hero h2{margin:0}.expert-plugin-hero p{margin:5px 0;color:#aaa}.expert-plugin-actions{display:grid;gap:10px}.expert-plugin-actions button,.expert-plugin-list button{width:100%;padding:15px;border:1px solid #414141;border-radius:16px;background:#2b2b2b;color:#fff;text-align:left}.expert-plugin-info{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px 0;border-bottom:1px solid #333}.expert-plugin-info span:first-child{color:#aaa}.expert-plugin-info span:last-child{overflow-wrap:anywhere}.expert-skill-chip{display:inline-flex;margin:5px;padding:12px 16px;border-radius:30px;background:#252525;color:#fff}',
     '.expert-browser-bookmark{display:block;padding:12px;border-bottom:1px solid #333;color:#fff;text-decoration:none}',
+  ].join('');
+  style.textContent += [
+    '.chat-composer.expert-fixed-composer{display:flex!important;align-items:center!important;gap:7px!important;width:100%!important;box-sizing:border-box!important;padding:8px 9px!important;min-height:68px!important;overflow:visible!important}',
+    '.chat-composer.expert-fixed-composer>button{display:inline-flex!important;align-items:center!important;justify-content:center!important;visibility:visible!important;opacity:1!important;position:relative!important;z-index:3!important;flex-shrink:0!important;margin:0!important;padding:0!important;line-height:1!important;font-weight:800!important}',
+    '.chat-composer.expert-fixed-composer>button:first-child:not(.expert-think-toggle){width:42px!important;height:42px!important;min-width:42px!important;flex:0 0 42px!important;border:1px solid #505050!important;border-radius:50%!important;background:#333!important;color:#fff!important;font-size:26px!important;font-weight:800!important}',
+    '.chat-composer.expert-fixed-composer>input{display:block!important;flex:1 1 auto!important;min-width:58px!important;width:auto!important;padding:0 3px!important;background:transparent!important;color:#fff!important;font-size:16px!important;font-weight:550!important;line-height:1.3!important}',
+    '.chat-composer .expert-composer-control{width:44px!important;height:44px!important;min-width:44px!important;flex:0 0 44px!important;border-radius:50%!important;border:1px solid #829cf1!important;background:#303747!important;color:#fff!important;box-shadow:0 0 0 2px rgba(91,131,255,.14)!important}',
+    '.chat-composer .expert-voice-chat{width:48px!important;height:48px!important;min-width:48px!important;flex:0 0 48px!important;border:0!important;background:var(--expert-accent,#5b83ff)!important;color:#fff!important;box-shadow:0 3px 13px rgba(91,131,255,.42)!important}',
+    '.chat-composer .expert-send-button{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:46px!important;height:46px!important;min-width:46px!important;flex:0 0 46px!important;padding:0!important;border:1px solid rgba(255,255,255,.35)!important;border-radius:50%!important;background:var(--expert-accent,#5b83ff)!important;color:#fff!important;font-size:24px!important;font-weight:900!important;box-shadow:0 3px 13px rgba(91,131,255,.4)!important}',
+    '.chat-composer .expert-composer-control svg,.chat-composer .expert-send-button svg{display:block!important;width:24px!important;height:24px!important;fill:none!important;stroke:currentColor!important;stroke-width:2.7!important;stroke-linecap:round!important;stroke-linejoin:round!important;pointer-events:none!important}',
+    '.chat-composer .expert-send-button svg{width:25px!important;height:25px!important;stroke-width:3!important}',
+    '.chat-composer.expert-fixed-composer>.expert-think-toggle{width:36px!important;height:36px!important;min-width:36px!important;flex:0 0 36px!important}',
+    '.chat-composer.expert-fixed-composer>button:focus-visible{outline:3px solid #fff!important;outline-offset:2px!important}',
+    '@media(max-width:380px){.chat-composer.expert-fixed-composer{gap:5px!important;padding:7px!important}.chat-composer.expert-fixed-composer>button:first-child:not(.expert-think-toggle){width:39px!important;height:39px!important;min-width:39px!important;flex-basis:39px!important}.chat-composer .expert-composer-control{width:41px!important;height:41px!important;min-width:41px!important;flex-basis:41px!important}.chat-composer .expert-voice-chat{width:44px!important;height:44px!important;min-width:44px!important;flex-basis:44px!important}.chat-composer .expert-send-button{width:43px!important;height:43px!important;min-width:43px!important;flex-basis:43px!important}.chat-composer.expert-fixed-composer>input{font-size:14px!important;min-width:48px!important}}',
   ].join('');
   document.head.appendChild(style);
 

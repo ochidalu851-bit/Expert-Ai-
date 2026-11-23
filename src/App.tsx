@@ -477,7 +477,7 @@ function App() {
       <iframe
         ref={frameRef}
         className="expert-mobile-app"
-        src="/mobile-ui-pack/index.html?v=expert-4"
+        src="/mobile-ui-pack/index.html?v=expert-5-composer"
         title="Expert AI"
         allow="camera; microphone; clipboard-read; clipboard-write; geolocation; web-share"
       />
