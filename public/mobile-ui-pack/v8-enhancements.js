@@ -133,11 +133,14 @@
   // Nested quick-action menus exactly matching the Add and Plugins sheets in the recording.
   const oldHandle8=handleAction;
   const addMenuLayerStyle = {
-    position:'fixed', left:'14px', right:'14px', top:'auto',
-    bottom:'calc(env(safe-area-inset-bottom, 0px) + 80px)',
-    width:'auto', height:'auto', minHeight:'0', maxWidth:'460px',
-    maxHeight:'min(78vh, 580px)', overflow:'visible',
-    display:'flex', alignItems:'flex-end', justifyContent:'center',
+    position:'fixed', left:'50%', right:'auto', top:'auto',
+    bottom:'calc(env(safe-area-inset-bottom, 0px) + 76px)',
+    transform:'translateX(-50%)',
+    width:'min(calc(100vw - 24px), 430px)',
+    height:'min(52vh, 370px)', minHeight:'0',
+    maxWidth:'430px', maxHeight:'min(52vh, 370px)',
+    overflow:'visible', display:'flex',
+    alignItems:'stretch', justifyContent:'center',
     padding:'0', margin:'0', background:'transparent',
     border:'0', borderRadius:'0', boxShadow:'none',
     zIndex:'100000', pointerEvents:'auto', isolation:'isolate'
@@ -174,43 +177,45 @@
     modalLayer.dataset.expertAddMenu='true';
     const sheet=modalLayer.querySelector('.expert-add-sheet');
     applyImportantStyles(sheet,{
-      display:'flex',flexDirection:'column',gap:'4px',
-      position:'relative',width:'100%',maxWidth:'460px',
-      maxHeight:'min(78vh,580px)',overflowY:'auto',
-      boxSizing:'border-box',margin:'0',padding:'8px 12px 12px',
+      display:'flex',flexDirection:'column',gap:'0',
+      position:'relative',width:'100%',height:'100%',minHeight:'0',
+      maxWidth:'430px',maxHeight:'100%',overflow:'hidden',
+      boxSizing:'border-box',margin:'0',padding:'6px 10px 8px',
       background:'#303030',color:'#f7f7f7',
-      border:'1px solid #464646',borderRadius:'30px',
-      boxShadow:'0 16px 44px rgba(0,0,0,.48)',
-      fontFamily:'Inter,Roboto,"Helvetica Neue",Arial,sans-serif',
-      fontStyle:'normal',textAlign:'left',transform:'none'
+      border:'1px solid #464646',borderRadius:'26px',
+      boxShadow:'0 12px 30px rgba(0,0,0,.42)',
+      fontFamily:'Roboto,"Helvetica Neue",Arial,sans-serif',
+      fontStyle:'normal',textAlign:'left',transform:'none',
+      pointerEvents:'auto'
     });
     sheet.querySelectorAll('.expert-add-option').forEach(button=>{
       applyImportantStyles(button,{
         appearance:'none',WebkitAppearance:'none',
-        display:'flex',width:'100%',minHeight:'80px',height:'80px',
-        flex:'0 0 80px',alignItems:'center',justifyContent:'flex-start',
-        gap:'16px',margin:'0',padding:'7px 10px',
-        border:'0',borderRadius:'18px',background:'transparent',
+        display:'flex',width:'100%',minHeight:'0',height:'auto',
+        flex:'1 1 0',alignItems:'center',justifyContent:'flex-start',
+        gap:'14px',margin:'0',padding:'4px 8px',
+        border:'0',borderRadius:'16px',background:'transparent',
         color:'#f7f7f7',boxShadow:'none',outline:'none',
-        fontFamily:'Inter,Roboto,"Helvetica Neue",Arial,sans-serif',
-        fontSize:'19px',fontStyle:'normal',fontWeight:'500',
-        letterSpacing:'-.35px',lineHeight:'1.2',textAlign:'left',
+        fontFamily:'Roboto,"Helvetica Neue",Arial,sans-serif',
+        fontSize:'18px',fontStyle:'normal',fontWeight:'500',
+        letterSpacing:'-.25px',lineHeight:'1.2',textAlign:'left',
         textDecoration:'none',textShadow:'none',whiteSpace:'normal',
         cursor:'pointer',opacity:'1',visibility:'visible',
-        colorScheme:'dark',forcedColorAdjust:'none'
+        colorScheme:'dark',forcedColorAdjust:'none',
+        pointerEvents:'auto'
       });
       const icon=button.querySelector('.expert-add-icon');
       applyImportantStyles(icon,{
-        display:'flex',flex:'0 0 60px',width:'60px',height:'60px',
-        minWidth:'60px',minHeight:'60px',alignItems:'center',
+        display:'flex',flex:'0 0 52px',width:'52px',height:'52px',
+        minWidth:'52px',minHeight:'52px',alignItems:'center',
         justifyContent:'center',borderRadius:'50%',
         background:'#3b3b3b',color:'#fff',boxShadow:'none',
         padding:'0',margin:'0',opacity:'1',visibility:'visible'
       });
       const svg=icon.querySelector('svg');
       applyImportantStyles(svg,{
-        display:'block',width:'36px',height:'36px',
-        minWidth:'36px',minHeight:'36px',
+        display:'block',width:'30px',height:'30px',
+        minWidth:'30px',minHeight:'30px',
         fill:'none',stroke:'#fff',strokeWidth:'3.2',
         strokeLinecap:'round',strokeLinejoin:'round',
         overflow:'visible',opacity:'1',visibility:'visible'
@@ -225,9 +230,9 @@
       applyImportantStyles(label,{
         display:'block',flex:'1 1 auto',minWidth:'0',
         color:'#f7f7f7',
-        fontFamily:'Inter,Roboto,"Helvetica Neue",Arial,sans-serif',
-        fontSize:'19px',fontStyle:'normal',fontWeight:'500',
-        letterSpacing:'-.35px',lineHeight:'1.2',
+        fontFamily:'Roboto,"Helvetica Neue",Arial,sans-serif',
+        fontSize:'18px',fontStyle:'normal',fontWeight:'500',
+        letterSpacing:'-.25px',lineHeight:'1.2',
         textAlign:'left',textDecoration:'none',textShadow:'none',
         opacity:'1',visibility:'visible'
       });
@@ -238,7 +243,21 @@
     {label:'Create image',value:'v8CreateImage'},{label:'Search',value:'v8Search'},{label:'Thinking',value:'v8Thinking'},
     {label:'Deep research',value:'v8DeepResearch'},{label:'Study',value:'v8Study'},{label:'OpenAI Platform',value:'v8Platform'}
   ]);
-  const launchPicker=id=>{const el=document.getElementById(id);if(el){el.click();return true;}toast('Open a chat before choosing a file.');return false;};
+  const launchPicker=id=>{
+    const el=document.getElementById(id);
+    if(!el){toast('Open a chat before choosing a file.');return false;}
+    try {
+      if(typeof el.showPicker==='function') el.showPicker();
+      else el.click();
+      return true;
+    } catch(error) {
+      try { el.click(); return true; }
+      catch(fallbackError) {
+        toast('Your device did not open the file picker. Try again or use Files.');
+        return false;
+      }
+    }
+  };
   const beginConnectorInstall=name=>{
     prefs.pendingConnectorInstall=name;save();
     openModal('Connect '+name,
