@@ -436,7 +436,7 @@ function App() {
       <main className="expert-login-screen">
         <form className="expert-login-form" onSubmit={saveMigratedPassword}>
           <h1>Secure your migrated account</h1>
-          <p>Your AppDeploy account is now on Railway. Choose a new password before continuing.</p>
+          <p>Your Expert AI account is ready. Choose a new password before continuing.</p>
           <label htmlFor="expert-new-password">New password</label>
           <input id="expert-new-password" type="password" autoComplete="new-password" minLength={10} maxLength={256} required value={newPassword} onChange={event => setNewPassword(event.target.value)} placeholder="At least 10 characters" />
           <label htmlFor="expert-confirm-new-password">Confirm password</label>
