@@ -132,12 +132,34 @@
 
   // Nested quick-action menus exactly matching the Add and Plugins sheets in the recording.
   const oldHandle8=handleAction;
+  const addMenuLayerStyle = {
+    position:'fixed', left:'14px', right:'14px', top:'auto',
+    bottom:'calc(env(safe-area-inset-bottom, 0px) + 80px)',
+    width:'auto', height:'auto', minHeight:'0', maxWidth:'460px',
+    maxHeight:'min(78vh, 580px)', overflow:'visible',
+    display:'flex', alignItems:'flex-end', justifyContent:'center',
+    padding:'0', margin:'0', background:'transparent',
+    border:'0', borderRadius:'0', boxShadow:'none',
+    zIndex:'100000', pointerEvents:'auto', isolation:'isolate'
+  };
+  const applyImportantStyles=(node,styles)=>{
+    Object.entries(styles).forEach(([key,value])=>node.style.setProperty(key.replace(/[A-Z]/g,m=>'-'+m.toLowerCase()),String(value),'important'));
+  };
+  const addMenuLayerProps=Object.keys(addMenuLayerStyle);
+  const closeAddMenu=()=>{
+    modalLayer.hidden=true;
+    addMenuLayerProps.forEach(key=>modalLayer.style.removeProperty(key.replace(/[A-Z]/g,m=>'-'+m.toLowerCase())));
+    delete modalLayer.dataset.expertAddMenu;
+  };
+  modalLayer.addEventListener('click',event=>{
+    if(event.target===modalLayer && modalLayer.dataset.expertAddMenu==='true') closeAddMenu();
+  },true);
   const showAddMenu=()=>{
     const icons={
       camera:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M7 16.5h7l3.4-5h13.2l3.4 5H41a3.5 3.5 0 0 1 3.5 3.5v18A3.5 3.5 0 0 1 41 41.5H7A3.5 3.5 0 0 1 3.5 38V20A3.5 3.5 0 0 1 7 16.5Z"/><circle cx="24" cy="28.5" r="8.3"/></svg>`,
       photos:`<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="4.5" y="5" width="39" height="38" rx="5.5"/><circle cx="31.5" cy="16.5" r="4.2"/><path d="m6.5 34 9-8.5a4 4 0 0 1 5.6 0L40 43"/></svg>`,
       files:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M17 20v13a7 7 0 0 0 14 0V14a9 9 0 0 0-18 0v20a13 13 0 0 0 26 0V17"/></svg>`,
-      plugins:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M35.7 13.2A19 19 0 1 0 40.3 30"/><path d="M17 19.5v-5m0 5a5.5 5.5 0 0 0-5.5 5.5v2.5a5.5 5.5 0 0 0 5.5 5.5h8.5a5.5 5.5 0 0 0 5.5-5.5v-2.5a5.5 5.5 0 0 0-5.5-5.5H17Zm5 0v-5m0 5v-3"/></svg>`,
+      plugins:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M18 7v8M30 7v8M14 15h20v8a10 10 0 0 1-10 10v7M18 15v-4m12 4v-4M17 41h14"/></svg>`,
       think:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8.5 33.5a19 19 0 1 1 31 0"/><path d="m24 25 11-11"/><circle cx="24" cy="26" r="4"/></svg>`
     };
     const items=[
@@ -147,7 +169,69 @@
       ['Plugins','v8Plugins','plugins'],
       ['Think harder','v8ThinkHarder','think']
     ];
-    modalLayer.innerHTML=`<section class="expert-add-sheet" role="dialog" aria-label="Add to message">${items.map(([label,action,icon])=>`<button type="button" class="expert-add-option" data-action="${action}"><span class="expert-add-icon">${icons[icon]}</span><span class="expert-add-label">${label}</span></button>`).join('')}</section>`;
+    modalLayer.innerHTML=`<section class="expert-add-sheet" role="dialog" aria-label="Add to message">${items.map(([label,action,icon])=>`<button type="button" class="expert-add-option" data-action="${action}" aria-label="${label}"><span class="expert-add-icon">${icons[icon]}</span><span class="expert-add-label">${label}</span></button>`).join('')}</section>`;
+    applyImportantStyles(modalLayer,addMenuLayerStyle);
+    modalLayer.dataset.expertAddMenu='true';
+    const sheet=modalLayer.querySelector('.expert-add-sheet');
+    applyImportantStyles(sheet,{
+      display:'flex',flexDirection:'column',gap:'4px',
+      position:'relative',width:'100%',maxWidth:'460px',
+      maxHeight:'min(78vh,580px)',overflowY:'auto',
+      boxSizing:'border-box',margin:'0',padding:'8px 12px 12px',
+      background:'#303030',color:'#f7f7f7',
+      border:'1px solid #464646',borderRadius:'30px',
+      boxShadow:'0 16px 44px rgba(0,0,0,.48)',
+      fontFamily:'Inter,Roboto,"Helvetica Neue",Arial,sans-serif',
+      fontStyle:'normal',textAlign:'left',transform:'none'
+    });
+    sheet.querySelectorAll('.expert-add-option').forEach(button=>{
+      applyImportantStyles(button,{
+        appearance:'none',WebkitAppearance:'none',
+        display:'flex',width:'100%',minHeight:'80px',height:'80px',
+        flex:'0 0 80px',alignItems:'center',justifyContent:'flex-start',
+        gap:'16px',margin:'0',padding:'7px 10px',
+        border:'0',borderRadius:'18px',background:'transparent',
+        color:'#f7f7f7',boxShadow:'none',outline:'none',
+        fontFamily:'Inter,Roboto,"Helvetica Neue",Arial,sans-serif',
+        fontSize:'19px',fontStyle:'normal',fontWeight:'500',
+        letterSpacing:'-.35px',lineHeight:'1.2',textAlign:'left',
+        textDecoration:'none',textShadow:'none',whiteSpace:'normal',
+        cursor:'pointer',opacity:'1',visibility:'visible',
+        colorScheme:'dark',forcedColorAdjust:'none'
+      });
+      const icon=button.querySelector('.expert-add-icon');
+      applyImportantStyles(icon,{
+        display:'flex',flex:'0 0 60px',width:'60px',height:'60px',
+        minWidth:'60px',minHeight:'60px',alignItems:'center',
+        justifyContent:'center',borderRadius:'50%',
+        background:'#3b3b3b',color:'#fff',boxShadow:'none',
+        padding:'0',margin:'0',opacity:'1',visibility:'visible'
+      });
+      const svg=icon.querySelector('svg');
+      applyImportantStyles(svg,{
+        display:'block',width:'36px',height:'36px',
+        minWidth:'36px',minHeight:'36px',
+        fill:'none',stroke:'#fff',strokeWidth:'3.2',
+        strokeLinecap:'round',strokeLinejoin:'round',
+        overflow:'visible',opacity:'1',visibility:'visible'
+      });
+      icon.querySelectorAll('path,circle,rect,line,polyline').forEach(shape=>{
+        applyImportantStyles(shape,{
+          fill:'none',stroke:'#fff',strokeWidth:'3.2',
+          strokeLinecap:'round',strokeLinejoin:'round'
+        });
+      });
+      const label=button.querySelector('.expert-add-label');
+      applyImportantStyles(label,{
+        display:'block',flex:'1 1 auto',minWidth:'0',
+        color:'#f7f7f7',
+        fontFamily:'Inter,Roboto,"Helvetica Neue",Arial,sans-serif',
+        fontSize:'19px',fontStyle:'normal',fontWeight:'500',
+        letterSpacing:'-.35px',lineHeight:'1.2',
+        textAlign:'left',textDecoration:'none',textShadow:'none',
+        opacity:'1',visibility:'visible'
+      });
+    });
     modalLayer.hidden=false;
   };
   const showToolsMenu=()=>openModal('Plugins','Choose a tool for this message.',[
@@ -165,11 +249,11 @@
     if(action==='composerPlus'){showAddMenu();return;}
     if(action==='v8BrowseDeviceFiles'){launchPicker('nexaDeviceFilesInput');return;}
     if(action==='v8OpenPluginsMenu'){showToolsMenu();return;}
-    if(action==='v8Camera'){modalLayer.hidden=true;launchPicker('nexaCameraInput');return;}
-    if(action==='v8Photos'){modalLayer.hidden=true;launchPicker('nexaPhotosInput');return;}
-    if(action==='v8Files'){modalLayer.hidden=true;launchPicker('nexaDeviceFilesInput');return;}
-    if(action==='v8Plugins'){modalLayer.hidden=true;nav('plugins');return;}
-    if(action==='v8ThinkHarder'){prefs.reasoningMode=prefs.reasoningMode==='high'?'standard':'high';save();modalLayer.hidden=true;render();toast(prefs.reasoningMode==='high'?'Think harder enabled.':'Think harder disabled.');return;}
+    if(action==='v8Camera'){closeAddMenu();launchPicker('nexaCameraInput');return;}
+    if(action==='v8Photos'){closeAddMenu();launchPicker('nexaPhotosInput');return;}
+    if(action==='v8Files'){closeAddMenu();launchPicker('nexaDeviceFilesInput');return;}
+    if(action==='v8Plugins'){closeAddMenu();nav('plugins');return;}
+    if(action==='v8ThinkHarder'){const enabled=prefs.reasoningMode!=='high';prefs.reasoningMode=enabled?'high':'standard';save();closeAddMenu();render();toast(enabled?'Think harder enabled.':'Think harder disabled.');return;}
     if(action==='v8CreateImage'){prefs.composerToolMode='Create image';modalLayer.hidden=true;nav('images');return;}
     if(action==='v8Search'){prefs.composerToolMode='Search';prefs.studyMode=false;save();modalLayer.hidden=true;render();toast('Search mode selected. A live search provider is not connected.');return;}
     if(action==='v8Thinking'){prefs.reasoningMode=prefs.reasoningMode==='high'?'standard':'high';prefs.composerToolMode='Thinking';save();modalLayer.hidden=true;render();toast('Thinking mode selected. Hidden reasoning is not displayed.');return;}
@@ -211,10 +295,10 @@
   };
   const oldChoice8=clickChoice;
   clickChoice=function(value){
-    if(value==='v8Plugins'){modalLayer.hidden=true;nav('plugins');return;}
-    if(value==='v8Camera'){modalLayer.hidden=true;launchPicker('nexaCameraInput');return;}
-    if(value==='v8Photos'){modalLayer.hidden=true;launchPicker('nexaPhotosInput');return;}
-    if(value==='v8Files'){modalLayer.hidden=true;const input=document.getElementById('nexaDeviceFilesInput');if(input)input.click();return;}
+    if(value==='v8Plugins'){closeAddMenu();nav('plugins');return;}
+    if(value==='v8Camera'){closeAddMenu();launchPicker('nexaCameraInput');return;}
+    if(value==='v8Photos'){closeAddMenu();launchPicker('nexaPhotosInput');return;}
+    if(value==='v8Files'){closeAddMenu();const input=document.getElementById('nexaDeviceFilesInput');if(input)input.click();return;}
     if(value==='v8ThinkHarder'){handleAction('v8ThinkHarder');return;}
     if(value==='v8ConfirmConnectorInstall'){
       const name=prefs.pendingConnectorInstall||appName();prefs.videoPluginAdded=addedApps();if(!prefs.videoPluginAdded.includes(name))prefs.videoPluginAdded.push(name);
