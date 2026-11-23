@@ -18,7 +18,8 @@ const sql = databaseUrl ? postgres(databaseUrl, { max: 5, connect_timeout: 10, i
 let dbReady = false;
 async function initDatabase() {
   if (!sql) return;
-  await sql.unsafe("CREATE TABLE IF NOT EXISTS expert_ai_users (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text NOT NULL UNIQUE, password_hash text NOT NULL, password_salt text NOT NULL, created_at timestamptz NOT NULL DEFAULT now())");
+  await sql.unsafe("CREATE TABLE IF NOT EXISTS expert_ai_users (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text NOT NULL UNIQUE, password_hash text NOT NULL, password_salt text NOT NULL, must_change_password boolean NOT NULL DEFAULT false, created_at timestamptz NOT NULL DEFAULT now())");
+  await sql.unsafe("ALTER TABLE expert_ai_users ADD COLUMN IF NOT EXISTS must_change_password boolean NOT NULL DEFAULT false");
   await sql.unsafe("CREATE TABLE IF NOT EXISTS expert_ai_sessions (token_hash text PRIMARY KEY, user_id uuid NOT NULL REFERENCES expert_ai_users(id) ON DELETE CASCADE, expires_at timestamptz NOT NULL, created_at timestamptz NOT NULL DEFAULT now())");
   await sql.unsafe("CREATE INDEX IF NOT EXISTS expert_ai_sessions_user_idx ON expert_ai_sessions(user_id)");
   await sql.unsafe("CREATE TABLE IF NOT EXISTS expert_ai_chats (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES expert_ai_users(id) ON DELETE CASCADE, title text NOT NULL DEFAULT 'New chat', messages jsonb NOT NULL DEFAULT '[]'::jsonb, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())");
@@ -38,6 +39,7 @@ async function initDatabase() {
   await sql.unsafe("CREATE TABLE IF NOT EXISTS expert_ai_integrations (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES expert_ai_users(id) ON DELETE CASCADE, provider text NOT NULL CHECK (provider IN ('google','github','slack','notion')), provider_account_id text, account_email text, workspace_name text, access_token_enc text NOT NULL, refresh_token_enc text, token_type text, scopes text NOT NULL DEFAULT '', expires_at timestamptz, metadata jsonb NOT NULL DEFAULT '{}'::jsonb, connected_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), UNIQUE(user_id, provider))");
   await sql.unsafe("CREATE INDEX IF NOT EXISTS expert_ai_integrations_user_idx ON expert_ai_integrations(user_id, provider)");
   await sql.unsafe("CREATE TABLE IF NOT EXISTS expert_ai_migration_runs (id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES expert_ai_users(id) ON DELETE CASCADE, source_user_id text NOT NULL, status text NOT NULL DEFAULT 'running', created_at timestamptz NOT NULL DEFAULT now(), finished_at timestamptz)");
+  await sql.unsafe("CREATE TABLE IF NOT EXISTS expert_ai_migration_codes (code_hash text PRIMARY KEY, user_id uuid NOT NULL REFERENCES expert_ai_users(id) ON DELETE CASCADE, migration_id uuid NOT NULL REFERENCES expert_ai_migration_runs(id) ON DELETE CASCADE, expires_at timestamptz NOT NULL, redeemed_at timestamptz)");
   dbReady = true;
 }
 try { await initDatabase(); } catch (error) { console.error("Database initialization failed", String(error)); }
@@ -96,7 +98,7 @@ async function currentUser(request: Request) {
   if (!sql || !dbReady) return null;
   const match = /^Bearer\s+([a-f0-9]{64})$/i.exec(request.headers.get("authorization") || "");
   if (!match) return null;
-  const rows = await sql.unsafe("SELECT u.id, u.email FROM expert_ai_sessions s JOIN expert_ai_users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at > now()", [await digest(match[1])]);
+  const rows = await sql.unsafe("SELECT u.id, u.email, u.must_change_password FROM expert_ai_sessions s JOIN expert_ai_users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at > now()", [await digest(match[1])]);
   return rows[0] || null;
 }
 function extractText(data: any) {
@@ -488,6 +490,18 @@ async function handler(request: Request) {
     if (match && sql) await sql.unsafe("DELETE FROM expert_ai_sessions WHERE token_hash=$1", [await digest(match[1])]);
     return json({ ok: true }, 200, origin);
   }
+  if (url.pathname === "/api/auth/set-password" && request.method === "POST") {
+    if (!sql || !dbReady) return json({ error: "Database is not ready." }, 503, origin);
+    const user = await currentUser(request);
+    if (!user) return json({ error: "Sign in to continue." }, 401, origin);
+    const body = await parseBody(request);
+    const password = String(body.password || "");
+    if (password.length < 10 || password.length > 256) return json({ error: "Password must be between 10 and 256 characters." }, 400, origin);
+    const salt = randomHex(16);
+    const hash = await passwordHash(password, salt);
+    await sql.unsafe("UPDATE expert_ai_users SET password_hash=$1,password_salt=$2,must_change_password=false WHERE id=$3", [hash,salt,user.id]);
+    return json({ ok: true }, 200, origin);
+  }
   const oauthCallbackMatch = /^\/api\/oauth\/(google|github|slack|notion)\/callback$/.exec(url.pathname);
   if (oauthCallbackMatch && request.method === "GET") {
     try { return await handleOAuthCallback(oauthCallbackMatch[1],request); }
@@ -495,6 +509,18 @@ async function handler(request: Request) {
       console.error("OAuth callback failed",oauthCallbackMatch[1],String(error).slice(0,220));
       return integrationReturnUrl(oauthCallbackMatch[1],false,"The connection could not be completed. Check provider settings and try again.");
     }
+  }
+  if (url.pathname === "/api/migration/redeem" && request.method === "POST") {
+    if (!sql || !dbReady) return json({ error: "Database is not ready." }, 503, origin);
+    const body = await parseBody(request);
+    const code = String(body.code || "").trim();
+    if (!/^[a-f0-9]{32}$/i.test(code)) return json({ error: "The handoff code is invalid or expired." }, 400, origin);
+    const rows = await sql.unsafe("UPDATE expert_ai_migration_codes SET redeemed_at=now() WHERE code_hash=$1 AND redeemed_at IS NULL AND expires_at>now() RETURNING user_id", [await digest(code)]);
+    if (!rows.length) return json({ error: "This handoff code has expired or has already been used." }, 401, origin);
+    const accessToken = await createSession(rows[0].user_id);
+    const userRows = await sql.unsafe("SELECT id,email,must_change_password FROM expert_ai_users WHERE id=$1 LIMIT 1", [rows[0].user_id]);
+    if (!userRows.length) return json({ error: "The migrated account could not be found." }, 404, origin);
+    return json({ access_token: accessToken, user: userRows[0] }, 200, origin);
   }
   if (url.pathname === "/api/migration/import" && request.method === "POST") {
     const expected = Bun.env.APPDEPLOY_MIGRATION_TOKEN || "";
@@ -513,7 +539,7 @@ async function handler(request: Request) {
         temporaryPassword = randomHex(16);
         const salt = randomHex(16);
         const hash = await passwordHash(temporaryPassword, salt);
-        rows = await sql.unsafe("INSERT INTO expert_ai_users(email,password_hash,password_salt) VALUES($1,$2,$3) RETURNING id,email", [email,hash,salt]);
+        rows = await sql.unsafe("INSERT INTO expert_ai_users(email,password_hash,password_salt,must_change_password) VALUES($1,$2,$3,true) RETURNING id,email,must_change_password", [email,hash,salt]);
         accountCreated = true;
       }
       const user = rows[0];
@@ -589,7 +615,9 @@ async function handler(request: Request) {
       await sql.unsafe("INSERT INTO expert_ai_preferences(user_id,preferences) VALUES($1,$2::jsonb) ON CONFLICT(user_id) DO UPDATE SET preferences=expert_ai_preferences.preferences || EXCLUDED.preferences,updated_at=now()",[user.id,JSON.stringify(preferences)]);
       await sql.unsafe("UPDATE expert_ai_migration_runs SET status='complete',finished_at=now() WHERE id=$1 AND user_id=$2",[migrationId,user.id]);
       const counts = await sql.unsafe("SELECT (SELECT count(*) FROM expert_ai_chats WHERE user_id=$1) AS chats,(SELECT count(*) FROM expert_ai_projects WHERE user_id=$1) AS projects,(SELECT count(*) FROM expert_ai_files WHERE user_id=$1) AS files,(SELECT count(*) FROM expert_ai_integrations WHERE user_id=$1) AS connections",[user.id]);
-      return json({ok:true,counts:counts[0]},200,origin);
+      const handoffCode = randomHex(16);
+      await sql.unsafe("INSERT INTO expert_ai_migration_codes(code_hash,user_id,migration_id,expires_at) VALUES($1,$2,$3,now()+interval '10 minutes')",[await digest(handoffCode),user.id,migrationId]);
+      return json({ok:true,counts:counts[0],handoffCode},200,origin);
     }
     return json({error:"Unknown migration action."},400,origin);
   }
