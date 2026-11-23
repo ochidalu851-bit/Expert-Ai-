@@ -1,6 +1,9 @@
 
 import postgres from "postgres";
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { lookup as dnsLookup } from "node:dns/promises";
+import { request as httpsRequest } from "node:https";
+import { isIP } from "node:net";
 const databaseUrl = Bun.env.DATABASE_URL || "";
 const openAiKey = Bun.env.OPENAI_API_KEY || "";
 const bucketName = Bun.env.S3_BUCKET || "";
@@ -49,7 +52,8 @@ function json(data: unknown, status = 200, origin?: string | null) {
   const headers = new Headers({ "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "vary": "Origin" });
   const allowedOrigins = appOrigin.split(",").map(value => value.trim()).filter(Boolean);
   if (origin && allowedOrigins.includes(origin)) headers.set("access-control-allow-origin", origin);
-  headers.set("access-control-allow-headers", "authorization, content-type");
+  headers.set("access-control-allow-headers", "authorization, content-type, x-railway-debug");
+  headers.set("access-control-expose-headers", "X-Railway-Edge, X-Railway-Upstream-Zone");
   headers.set("access-control-allow-methods", "GET, POST, PUT, DELETE, OPTIONS");
   return new Response(status === 204 ? null : JSON.stringify(data), { status, headers });
 }
@@ -70,6 +74,184 @@ async function parseBody(request: Request) {
   if (length > 7_000_000) throw new Error("Request body is too large.");
   return await request.json() as Record<string, any>;
 }
+
+const CLOUD_DOWNLOAD_MAX_BYTES = 25 * 1024 * 1024;
+let cloudNetworkSnapshotCache: { expiresAt: number; value: any } | null = null;
+
+function isPublicIpv4(address: string) {
+  if (isIP(address) !== 4) return false;
+  const parts = address.split(".").map(Number);
+  if (parts.length !== 4 || parts.some(part => !Number.isInteger(part) || part < 0 || part > 255)) return false;
+  const [a,b,c] = parts;
+  return !(
+    a === 0 || a === 10 || a === 127 || a >= 224 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && (b === 0 || (b === 0 && c === 0) || (b === 0 && c === 2) || (b === 168))) ||
+    (a === 192 && b === 88 && c === 99) ||
+    (a === 198 && (b === 18 || b === 19 || (b === 51 && c === 100))) ||
+    (a === 203 && b === 0 && c === 113)
+  );
+}
+
+async function resolvePinnedPublicIpv4(hostname: string) {
+  const kind = isIP(hostname);
+  if (kind === 4) {
+    if (!isPublicIpv4(hostname)) throw new Error("Cloud downloads cannot access private or reserved IP addresses.");
+    return hostname;
+  }
+  if (kind === 6 || !hostname || hostname === "localhost" || hostname.endsWith(".local") || hostname.endsWith(".internal")) {
+    throw new Error("Cloud downloads require a public HTTPS hostname.");
+  }
+  const records = await dnsLookup(hostname, { all: true, verbatim: true } as any);
+  const ipv4 = records.filter((item: any) => item.family === 4);
+  if (!ipv4.length || ipv4.some((item: any) => !isPublicIpv4(item.address))) {
+    throw new Error("The download host does not resolve only to public IPv4 addresses.");
+  }
+  return ipv4[0].address as string;
+}
+
+async function requestPinnedHttpsFile(target: URL, pinnedIp: string) {
+  return await new Promise<any>((resolve, reject) => {
+    let finished = false;
+    const finish = (error?: Error, value?: any) => {
+      if (finished) return;
+      finished = true;
+      if (error) reject(error);
+      else resolve(value);
+    };
+    const options: any = {
+      protocol: "https:",
+      hostname: target.hostname,
+      servername: target.hostname,
+      port: 443,
+      method: "GET",
+      path: target.pathname + target.search,
+      headers: { "user-agent": "ExpertAI-CloudDownloader/1.0", accept: "*/*", "accept-encoding": "identity" },
+      lookup: (_hostname: string, lookupOptions: any, callback: any) => {
+        if (lookupOptions && typeof lookupOptions === "object" && lookupOptions.all) callback(null, [{ address: pinnedIp, family: 4 }]);
+        else callback(null, pinnedIp, 4);
+      }
+    };
+    const outgoing = httpsRequest(options, (incoming: any) => {
+      const status = Number(incoming.statusCode || 0);
+      const redirect = [301,302,303,307,308].includes(status) ? String(incoming.headers.location || "") : "";
+      if (redirect) {
+        incoming.resume();
+        finish(undefined, { redirect });
+        return;
+      }
+      if (status < 200 || status >= 300) {
+        incoming.resume();
+        finish(new Error("The source website returned HTTP " + status + "."));
+        return;
+      }
+      const declaredLength = Number(incoming.headers["content-length"] || 0);
+      if (declaredLength > CLOUD_DOWNLOAD_MAX_BYTES) {
+        incoming.destroy();
+        outgoing.destroy();
+        finish(new Error("Cloud downloads are limited to 25 MB per file."));
+        return;
+      }
+      const chunks: Buffer[] = [];
+      let total = 0;
+      incoming.on("data", (chunk: Buffer) => {
+        total += chunk.length;
+        if (total > CLOUD_DOWNLOAD_MAX_BYTES) {
+          const error = new Error("Cloud downloads are limited to 25 MB per file.");
+          incoming.destroy(error);
+          outgoing.destroy(error);
+          finish(error);
+          return;
+        }
+        chunks.push(chunk);
+      });
+      incoming.on("end", () => finish(undefined, {
+        body: Buffer.concat(chunks, total),
+        contentType: String(incoming.headers["content-type"] || "application/octet-stream").split(";")[0].slice(0,160),
+        contentDisposition: String(incoming.headers["content-disposition"] || "")
+      }));
+      incoming.on("error", (error: Error) => finish(error));
+    });
+    outgoing.setTimeout(20000, () => outgoing.destroy(new Error("The source website timed out.")));
+    outgoing.on("error", (error: Error) => finish(error));
+    outgoing.end();
+  });
+}
+
+async function fetchPublicHttpsFile(rawUrl: string) {
+  let target: URL;
+  try { target = new URL(rawUrl); } catch { throw new Error("Enter a valid HTTPS file URL."); }
+  for (let redirectCount = 0; redirectCount <= 5; redirectCount++) {
+    if (target.protocol !== "https:" || target.username || target.password || (target.port && target.port !== "443")) {
+      throw new Error("Cloud downloads accept public HTTPS links on port 443 only.");
+    }
+    const pinnedIp = await resolvePinnedPublicIpv4(target.hostname);
+    const result = await requestPinnedHttpsFile(target, pinnedIp);
+    if (result.redirect) {
+      if (redirectCount === 5) throw new Error("The source website redirected too many times.");
+      target = new URL(result.redirect, target);
+      continue;
+    }
+    return { ...result, sourceHost: target.hostname, finalUrl: target };
+  }
+  throw new Error("The source website could not be reached.");
+}
+
+function safeDownloadedName(target: URL, contentDisposition: string) {
+  let name = "";
+  const star = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(contentDisposition);
+  const plain = /filename\s*=\s*"?([^";]+)"?/i.exec(contentDisposition);
+  const supplied = star?.[1] ? decodeURIComponent(star[1].trim()) : plain?.[1]?.trim();
+  if (supplied) name = supplied;
+  if (!name) {
+    const last = target.pathname.split("/").filter(Boolean).pop() || "download.bin";
+    try { name = decodeURIComponent(last); } catch { name = last; }
+  }
+  name = name.replace(/[\\/\0\r\n"]/g, "_").trim().slice(0,180);
+  return name && name !== "." && name !== ".." ? name : "download.bin";
+}
+
+async function getCloudNetworkSnapshot() {
+  if (cloudNetworkSnapshotCache && cloudNetworkSnapshotCache.expiresAt > Date.now()) return cloudNetworkSnapshotCache.value;
+  const response = await fetch("https://ipwho.is/", { signal: AbortSignal.timeout(8000), headers: { accept: "application/json" } });
+  if (!response.ok) throw new Error("The IP network information service returned HTTP " + response.status + ".");
+  const data = await response.json() as any;
+  if (data?.success !== true || !data?.ip) throw new Error("The cloud public IP could not be identified.");
+  const connection = data.connection || {};
+  const regionId = Bun.env.RAILWAY_REGION || Bun.env.RAILWAY_REPLICA_REGION || "iad";
+  const regionLabels: Record<string,string> = {
+    iad: "US East · Virginia, USA",
+    "us-east4-eqdc4a": "US East · Virginia, USA",
+    "us-west2": "US West · California, USA",
+    "europe-west4-drams3a": "Europe West · Amsterdam, Netherlands",
+    "asia-southeast1-eqsg3a": "Southeast Asia · Singapore"
+  };
+  const value = {
+    network: {
+      ip: String(data.ip),
+      ipType: String(data.type || ""),
+      country: String(data.country || ""),
+      countryCode: String(data.country_code || ""),
+      region: String(data.region || ""),
+      city: String(data.city || ""),
+      timezone: String(data.timezone?.id || ""),
+      connection: {
+        asn: connection.asn ? String(connection.asn) : "",
+        isp: String(connection.isp || ""),
+        org: String(connection.org || ""),
+        domain: String(connection.domain || "")
+      }
+    },
+    hosting: { provider: "Railway", regionId, regionName: regionLabels[regionId] || regionId },
+    lookupProvider: "IPWho (ipwho.is)",
+    checkedAt: new Date().toISOString()
+  };
+  cloudNetworkSnapshotCache = { expiresAt: Date.now() + 60000, value };
+  return value;
+}
+
 function randomHex(length = 32) {
   const bytes = crypto.getRandomValues(new Uint8Array(length));
   return Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("");
@@ -526,6 +708,43 @@ async function handler(request: Request) {
     if (!sql || !dbReady) return json({ error: "Database is not ready." }, 503, origin);
     const user = await currentUser(request);
     if (!user) return json({ error: "Sign in to continue." }, 401, origin);
+    if (url.pathname === "/api/network/status" && request.method === "GET") {
+      if (!rateLimit(request, "network-status-" + user.id, 20)) return json({ error: "Too many network checks. Try again later." }, 429, origin);
+      try {
+        const snapshot = await getCloudNetworkSnapshot();
+        return json({
+          ...snapshot,
+          route: {
+            edgePop: request.headers.get("x-railway-edge") || null,
+            upstreamZone: request.headers.get("x-railway-upstream-zone") || null,
+            note: "The Railway edge and serving zone are reported separately. The complete upstream BGP transit path is not exposed by this service."
+          }
+        }, 200, origin);
+      } catch (error) {
+        return json({
+          available: false,
+          hosting: { provider: "Railway", regionId: Bun.env.RAILWAY_REGION || Bun.env.RAILWAY_REPLICA_REGION || "iad" },
+          error: String((error as any)?.message || "Cloud network lookup failed.")
+        }, 200, origin);
+      }
+    }
+    if (url.pathname === "/api/network/download" && request.method === "POST") {
+      if (!rateLimit(request, "network-download-" + user.id, 5)) return json({ error: "Download limit reached. Try again in a few minutes." }, 429, origin);
+      if (!bucketName) return json({ error: "Secure Railway file storage is not configured." }, 503, origin);
+      const body = await parseBody(request);
+      const rawUrl = String(body.url || "").trim();
+      if (!rawUrl || rawUrl.length > 4000) return json({ error: "Enter a valid HTTPS file URL." }, 400, origin);
+      const remote = await fetchPublicHttpsFile(rawUrl);
+      if (!remote.body?.length) return json({ error: "The source website returned an empty file." }, 422, origin);
+      const name = safeDownloadedName(remote.finalUrl, remote.contentDisposition);
+      const contentType = String(remote.contentType || "application/octet-stream").slice(0,160);
+      await cleanExpiredFiles();
+      const id = crypto.randomUUID();
+      const objectKey = "users/" + user.id + "/" + id + "/" + name;
+      await bucketClient.send(new PutObjectCommand({ Bucket: bucketName, Key: objectKey, Body: remote.body, ContentType: contentType, ContentLength: remote.body.length }));
+      const rows = await sql.unsafe("INSERT INTO expert_ai_files(id,user_id,name,content_type,size,object_key,is_temporary,expires_at) VALUES($1,$2,$3,$4,$5,$6,false,NULL) RETURNING id,name,content_type,size,created_at", [id,user.id,name,contentType,remote.body.length,objectKey]);
+      return json({ ...rows[0], sourceHost: remote.sourceHost, route: "railway-cloud", url: "/api/files/" + id + "/download" }, 201, origin);
+    }
     if (url.pathname === "/api/models" && request.method === "GET") {
       try {
         const models = await listOpenAIChatModels();
