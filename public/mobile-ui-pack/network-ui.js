@@ -64,7 +64,7 @@
   pages.settings = function() {
     const html = previousSettingsPage();
     const item = '<button type="button" class="row" data-page="network"><span class="row-icon">⇄</span><span class="row-main"><span class="row-label">Network & Downloads</span><span class="row-sub">Live ISP, cloud route and download network selection</span></span><span class="chevron">›</span></button>';
-    return html.includes('<div class="search-dock">') ? html.replace('<div class="search-dock">', item + '<div class="search-dock">') : html + item;
+    return '<div class="group">' + item + '</div>' + html;
   };
   pages.network = networkPage;
   pageTitles.network = 'Network & Downloads';
