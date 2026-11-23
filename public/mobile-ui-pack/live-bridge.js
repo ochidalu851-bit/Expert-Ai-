@@ -116,7 +116,7 @@
       'defaultAssistant', 'theme', 'imagesTab', 'selectedImagePrompt', 'automaticRecharge',
       'useLocation', 'referencePhotoNames', 'pluginStates', 'activePlugin', 'activeDependencyApp',
       'chatFindQuery', 'recentChatTitle', 'voiceTipDismissed', 'v8FilesTab', 'v8FilesQuery',
-      'chatFileMeta', 'recentLocalFiles', 'pluginInstallPending', 'pluginInstallUrl'
+      'chatFileMeta', 'recentLocalFiles', 'pluginInstallPending', 'pluginInstallUrl', 'downloadNetworkMode'
     ];
     return Object.fromEntries(keys.filter(key => prefs[key] !== undefined).map(key => [key, prefs[key]]));
   }
