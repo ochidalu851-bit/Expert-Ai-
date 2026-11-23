@@ -598,3 +598,72 @@ textarea.field { resize: vertical; min-height: 85px; line-height: 1.5; }
   .chat-composer button.voice-send { flex-basis: 34px !important; width: 34px !important; min-width: 34px !important; }
   .chat-composer button.send-button { flex-basis: 44px !important; width: 44px !important; min-width: 44px !important; height: 44px !important; min-height: 44px !important; }
 }
+
+
+/* Screenshot-matched Plus menu for Expert AI. */
+.expert-add-sheet{
+  width:100%;
+  max-width:460px;
+  max-height:calc(100dvh - 30px);
+  margin:0 auto;
+  padding:8px 12px 12px;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  background:#303030;
+  border:1px solid #464646;
+  border-radius:30px;
+  box-shadow:0 16px 44px rgba(0,0,0,.48);
+}
+.expert-add-option{
+  display:flex;
+  width:100%;
+  min-height:80px;
+  align-items:center;
+  gap:16px;
+  padding:7px 10px;
+  border:0;
+  border-radius:18px;
+  background:transparent;
+  color:#f7f7f7;
+  text-align:left;
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.expert-add-option:active{background:#3a3a3a}
+.expert-add-icon{
+  display:flex;
+  flex:0 0 60px;
+  width:60px;
+  height:60px;
+  align-items:center;
+  justify-content:center;
+  border-radius:50%;
+  background:#3b3b3b;
+  color:#fff;
+}
+.expert-add-icon svg{
+  display:block;
+  width:36px;
+  height:36px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:3.2;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.expert-add-label{
+  display:block;
+  color:#f7f7f7;
+  font-family:Inter,Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-size:19px;
+  font-weight:500;
+  letter-spacing:-.35px;
+  line-height:1.2;
+}
+@media(max-width:380px){
+  .expert-add-sheet{padding:7px 9px 10px;border-radius:27px}
+  .expert-add-option{min-height:78px;gap:14px;padding-left:9px}
+  .expert-add-icon{width:58px;height:58px;flex-basis:58px}
+  .expert-add-icon svg{width:35px;height:35px}
+  .expert-add-label{font-size:18px}
+}
