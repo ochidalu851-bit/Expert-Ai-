@@ -132,10 +132,24 @@
 
   // Nested quick-action menus exactly matching the Add and Plugins sheets in the recording.
   const oldHandle8=handleAction;
-  const showAddMenu=()=>openModal('Add to your message','Choose an attachment or tool.',[
-    {label:'Camera',value:'v8Camera'},{label:'Photos',value:'v8Photos'},{label:'Files',value:'v8Files'},
-    {label:'Plugins',value:'v8Plugins'},{label:'Think harder',value:'v8ThinkHarder'}
-  ]);
+  const showAddMenu=()=>{
+    const icons={
+      camera:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M7 16.5h7l3.4-5h13.2l3.4 5H41a3.5 3.5 0 0 1 3.5 3.5v18A3.5 3.5 0 0 1 41 41.5H7A3.5 3.5 0 0 1 3.5 38V20A3.5 3.5 0 0 1 7 16.5Z"/><circle cx="24" cy="28.5" r="8.3"/></svg>`,
+      photos:`<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="4.5" y="5" width="39" height="38" rx="5.5"/><circle cx="31.5" cy="16.5" r="4.2"/><path d="m6.5 34 9-8.5a4 4 0 0 1 5.6 0L40 43"/></svg>`,
+      files:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M17 20v13a7 7 0 0 0 14 0V14a9 9 0 0 0-18 0v20a13 13 0 0 0 26 0V17"/></svg>`,
+      plugins:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M35.7 13.2A19 19 0 1 0 40.3 30"/><path d="M17 19.5v-5m0 5a5.5 5.5 0 0 0-5.5 5.5v2.5a5.5 5.5 0 0 0 5.5 5.5h8.5a5.5 5.5 0 0 0 5.5-5.5v-2.5a5.5 5.5 0 0 0-5.5-5.5H17Zm5 0v-5m0 5v-3"/></svg>`,
+      think:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8.5 33.5a19 19 0 1 1 31 0"/><path d="m24 25 11-11"/><circle cx="24" cy="26" r="4"/></svg>`
+    };
+    const items=[
+      ['Camera','v8Camera','camera'],
+      ['Photos','v8Photos','photos'],
+      ['Files','v8Files','files'],
+      ['Plugins','v8Plugins','plugins'],
+      ['Think harder','v8ThinkHarder','think']
+    ];
+    modalLayer.innerHTML=`<section class="expert-add-sheet" role="dialog" aria-label="Add to message">${items.map(([label,action,icon])=>`<button type="button" class="expert-add-option" data-action="${action}"><span class="expert-add-icon">${icons[icon]}</span><span class="expert-add-label">${label}</span></button>`).join('')}</section>`;
+    modalLayer.hidden=false;
+  };
   const showToolsMenu=()=>openModal('Plugins','Choose a tool for this message.',[
     {label:'Create image',value:'v8CreateImage'},{label:'Search',value:'v8Search'},{label:'Thinking',value:'v8Thinking'},
     {label:'Deep research',value:'v8DeepResearch'},{label:'Study',value:'v8Study'},{label:'OpenAI Platform',value:'v8Platform'}
@@ -153,9 +167,9 @@
     if(action==='v8OpenPluginsMenu'){showToolsMenu();return;}
     if(action==='v8Camera'){modalLayer.hidden=true;launchPicker('nexaCameraInput');return;}
     if(action==='v8Photos'){modalLayer.hidden=true;launchPicker('nexaPhotosInput');return;}
-    if(action==='v8Files'){modalLayer.hidden=true;nav('filesPicker');return;}
-    if(action==='v8Plugins'){showToolsMenu();return;}
-    if(action==='v8ThinkHarder'){prefs.reasoningMode=prefs.reasoningMode==='high'?'standard':'high';save();modalLayer.hidden=true;render();toast(prefs.reasoningMode==='high'?'Think harder enabled in this demo.':'Think harder disabled.');return;}
+    if(action==='v8Files'){modalLayer.hidden=true;launchPicker('nexaDeviceFilesInput');return;}
+    if(action==='v8Plugins'){modalLayer.hidden=true;nav('plugins');return;}
+    if(action==='v8ThinkHarder'){prefs.reasoningMode=prefs.reasoningMode==='high'?'standard':'high';save();modalLayer.hidden=true;render();toast(prefs.reasoningMode==='high'?'Think harder enabled.':'Think harder disabled.');return;}
     if(action==='v8CreateImage'){prefs.composerToolMode='Create image';modalLayer.hidden=true;nav('images');return;}
     if(action==='v8Search'){prefs.composerToolMode='Search';prefs.studyMode=false;save();modalLayer.hidden=true;render();toast('Search mode selected. A live search provider is not connected.');return;}
     if(action==='v8Thinking'){prefs.reasoningMode=prefs.reasoningMode==='high'?'standard':'high';prefs.composerToolMode='Thinking';save();modalLayer.hidden=true;render();toast('Thinking mode selected. Hidden reasoning is not displayed.');return;}
@@ -197,10 +211,10 @@
   };
   const oldChoice8=clickChoice;
   clickChoice=function(value){
-    if(value==='v8Plugins'){showToolsMenu();return;}
+    if(value==='v8Plugins'){modalLayer.hidden=true;nav('plugins');return;}
     if(value==='v8Camera'){modalLayer.hidden=true;launchPicker('nexaCameraInput');return;}
     if(value==='v8Photos'){modalLayer.hidden=true;launchPicker('nexaPhotosInput');return;}
-    if(value==='v8Files'){modalLayer.hidden=true;nav('filesPicker');return;}
+    if(value==='v8Files'){modalLayer.hidden=true;const input=document.getElementById('nexaDeviceFilesInput');if(input)input.click();return;}
     if(value==='v8ThinkHarder'){handleAction('v8ThinkHarder');return;}
     if(value==='v8ConfirmConnectorInstall'){
       const name=prefs.pendingConnectorInstall||appName();prefs.videoPluginAdded=addedApps();if(!prefs.videoPluginAdded.includes(name))prefs.videoPluginAdded.push(name);
