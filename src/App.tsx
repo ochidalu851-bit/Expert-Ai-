@@ -25,11 +25,24 @@ const api = {
 };
 const auth = {
   async getUser() {
+    const fragment = new URLSearchParams(window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash);
+    const handoffCode = fragment.get("handoff");
+    if (handoffCode) {
+      const response = await fetch(apiUrl("/api/migration/redeem"), {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ code: handoffCode })
+      });
+      const handoff = await response.json().catch(() => ({}));
+      if (!response.ok || !handoff?.access_token) throw new Error(String(handoff?.error || "The Railway handoff code could not be redeemed."));
+      localStorage.setItem(SESSION_KEY, String(handoff.access_token));
+      window.history.replaceState({}, "", window.location.pathname + window.location.search);
+    }
     if (!localStorage.getItem(SESSION_KEY)) return null;
     try {
       const result = await railwayRequest('/api/me');
       const raw = result?.user;
-      return raw ? { userId: String(raw.id || raw.userId || ''), email: String(raw.email || ''), name: String(raw.name || String(raw.email || '').split('@')[0]), picture: raw.picture || undefined, scope: 'railway' } : null;
+      return raw ? { userId: String(raw.id || raw.userId || ''), email: String(raw.email || ''), name: String(raw.name || String(raw.email || '').split('@')[0]), picture: raw.picture || undefined, scope: 'railway', mustChangePassword: raw.must_change_password === true } : null;
     } catch (reason) {
       if ((reason as { status?: number })?.status === 401) { localStorage.removeItem(SESSION_KEY); return null; }
       throw reason;
@@ -60,6 +73,7 @@ type AuthUser = {
   name?: string;
   picture?: string;
   scope: string;
+  mustChangePassword?: boolean;
 };
 type SavedLoginAccount = {
   email: string;
@@ -84,6 +98,11 @@ function App() {
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
+  const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [passwordSetupError, setPasswordSetupError] = useState('');
+  const [passwordSetupBusy, setPasswordSetupBusy] = useState(false);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
 
   const sendToFrame = useCallback((message: Record<string, unknown>) => {
@@ -105,6 +124,7 @@ function App() {
       .then(restored => {
         if (!active) return;
         setUser(restored as AuthUser | null);
+        setNeedsPasswordSetup(restored?.mustChangePassword === true);
         if (restored?.email) {
           const saved = { email: restored.email, name: restored.name || restored.email.split('@')[0] };
           localStorage.setItem('expertAI:lastLoginAccount', JSON.stringify(saved));
@@ -352,6 +372,31 @@ function App() {
     };
   }, [user, sendToFrame]);
 
+  const saveMigratedPassword = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setPasswordSetupError('');
+    if (newPassword.length < 10 || newPassword.length > 256) {
+      setPasswordSetupError('Use a password between 10 and 256 characters.');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setPasswordSetupError('The passwords do not match.');
+      return;
+    }
+    setPasswordSetupBusy(true);
+    try {
+      await api.post('/api/auth/set-password', { password: newPassword });
+      setNeedsPasswordSetup(false);
+      setNewPassword('');
+      setConfirmNewPassword('');
+      setUser(current => current ? { ...current, mustChangePassword: false } : current);
+    } catch (reason) {
+      setPasswordSetupError(reason instanceof Error ? reason.message : 'Your password could not be saved.');
+    } finally {
+      setPasswordSetupBusy(false);
+    }
+  };
+
   const signIn = async (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
     setSigningIn(true); setError('');
@@ -385,6 +430,23 @@ function App() {
     .trim()
     .slice(0, 2)
     .toUpperCase();
+
+  if (user && needsPasswordSetup) {
+    return (
+      <main className="expert-login-screen">
+        <form className="expert-login-form" onSubmit={saveMigratedPassword}>
+          <h1>Secure your migrated account</h1>
+          <p>Your AppDeploy account is now on Railway. Choose a new password before continuing.</p>
+          <label htmlFor="expert-new-password">New password</label>
+          <input id="expert-new-password" type="password" autoComplete="new-password" minLength={10} maxLength={256} required value={newPassword} onChange={event => setNewPassword(event.target.value)} placeholder="At least 10 characters" />
+          <label htmlFor="expert-confirm-new-password">Confirm password</label>
+          <input id="expert-confirm-new-password" type="password" autoComplete="new-password" minLength={10} maxLength={256} required value={confirmNewPassword} onChange={event => setConfirmNewPassword(event.target.value)} placeholder="Re-enter your password" />
+          {passwordSetupError ? <p className="expert-login-error" role="alert">{passwordSetupError}</p> : null}
+          <button type="submit" className="expert-login-submit" disabled={passwordSetupBusy}>{passwordSetupBusy ? 'Saving password…' : 'Save password and continue'}</button>
+        </form>
+      </main>
+    );
+  }
 
   if (!user) {
     return (
