@@ -8,6 +8,30 @@
   const cats = (C.categories||[]).map(c=>c.name);
   const all = C.records || [];
   let catLimit=40;
+  const requestedCategoryMap = [
+    {label:'Productivity', source:['productivity']},
+    {label:'Communication', source:['communication']},
+    {label:'Creativity', source:['creativity']},
+    {label:'Developer Tools', source:['developer tools']},
+    {label:'Fitness', source:['healthcare'], note:'Health and wellness records are retained under their original Healthcare source category in this requested section.'},
+    {label:'Finance', source:['finance']},
+    {label:'Travel', source:['travel']},
+    {label:'Entertainment', source:['entertainment']},
+    {label:'Education', source:['education & research'], note:'Records retain the original Education & research source category.'},
+    {label:'Business & Operations', source:['business & operations']},
+    {label:'Data & Analytics', source:['data & analytics','analytics'], note:'Includes the single source record labelled Analytics.'},
+    {label:'Scientific Research', source:['scientific research']},
+    {label:'Security', source:['security']},
+    {label:'Other', source:['other']}
+  ];
+  const categoryDefinition = name => requestedCategoryMap.find(x=>x.label===name);
+  const categoryRows = name => {
+    const def=categoryDefinition(name);
+    if(!def) return [];
+    const wanted=new Set(def.source.map(x=>x.toLowerCase()));
+    return all.filter(r=>(r.categories||[]).some(c=>wanted.has(String(c).toLowerCase())));
+  };
+  const categoryCount = name => categoryRows(name).length;
   const fmt = n => Number(n||0).toLocaleString();
   const recordName = r => r.name || 'Name not supplied / not verified';
   const recordPublisher = r => r.publisherName || 'Publisher not supplied / not verified';
@@ -37,7 +61,7 @@
       return true;
     });
   }
-  function resultsHtml(rows) {
+  function resultsHtml(rows, moreAction='loadCatalogueMore') {
     const shown=rows.slice(0,catLimit);
     const cards=shown.map(r=>{
       const icon=r.sourceIconUrl ? `<img class="nx-app-icon" src="${escCat(r.sourceIconUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<span class="nx-app-icon nx-icon-fallback">${escCat((recordName(r)[0]||'•').toUpperCase())}</span>`;
@@ -48,7 +72,7 @@
         ${icon}<span class="nx-result-main"><strong>${escCat(recordName(r))}</strong><small>${escCat(recordPublisher(r))} · ${escCat((r.categories||[]).join(', ')||'Category not supplied')}</small><small>${escCat(r.description||'Description not supplied / not verified')}</small><span class="nx-result-tags">${chip(state)}${families.map(f=>chip(f)).join('')}${chip(snapdates,'nx-muted')}</span></span><span class="nx-result-arrow">›</span>
       </button>`;
     }).join('');
-    return `${cards || `<div class="nx-empty">No catalogue entries match these filters.</div>`}${rows.length>shown.length?`<button class="outline nx-more" data-action="loadCatalogueMore">Show next 40 (${fmt(rows.length-shown.length)} remaining)</button>`:''}`;
+    return `${cards || `<div class="nx-empty">No catalogue entries match these filters.</div>`}${rows.length>shown.length?`<button class="outline nx-more" data-action="${moreAction}">Show next 40 (${fmt(rows.length-shown.length)} remaining)</button>`:''}`;
   }
   function updateCatalogueResults(reset=false) {
     if(reset) catLimit=40;
@@ -103,6 +127,29 @@
     }).join('');
     return `<div class="nx-intro"><div class="nx-eyebrow">NEXA AI FRAMEWORK</div><h2>12 capability families</h2><p>These are the capability families requested for Nexa AI. Record counts overlap because one listing may map to several families.</p></div><div class="nx-family-grid">${cards}</div><button class="outline" data-page="pluginCatalogue">Search catalogue</button>`;
   }
+  function categoryCataloguePage() {
+    catLimit=40;
+    const name=prefs.catalogueCategoryName||'';
+    const def=categoryDefinition(name);
+    if(!def) return `<div class="nx-empty">Category not found. <button class="outline" data-page="plugins">Back to Plugins</button></div>`;
+    const rows=categoryRows(name);
+    const sourceText=def.source.map(x=>x==='healthcare'?'Healthcare':x==='education & research'?'Education & research':x==='data & analytics'?'Data & Analytics':x==='analytics'?'Analytics':x.replace(/\b\w/g,c=>c.toUpperCase())).join(' + ');
+    return `<div class="nx-intro"><div class="nx-eyebrow">PLUGIN DIRECTORY · ${escCat(name.toUpperCase())}</div><h2>${escCat(name)}</h2><p>${def.note?escCat(def.note):'Catalogue records filed under this category in the supplied MCPTOP snapshot.'}</p><div class="nx-statline"><b>${fmt(rows.length)}</b><span>records in this section</span></div><small class="nx-smallnote">Original source category: ${escCat(sourceText)}</small></div>
+      <div class="nx-searchbox"><span>⌕</span><input id="nxCategorySearch" placeholder="Search ${escCat(name)} by name, publisher or description" autocomplete="off"></div>
+      <div class="nx-countline" id="nxCategoryCount">${fmt(rows.length)} records</div>
+      <div id="nxCategoryResults" class="nx-results">${resultsHtml(rows,'loadCatalogueCategoryMore')}</div>
+      <button class="outline" data-page="plugins">Back to Plugins</button>`;
+  }
+  function updateCategoryResults(reset=false) {
+    if(reset) catLimit=40;
+    const name=prefs.catalogueCategoryName||'';
+    const def=categoryDefinition(name);
+    if(!def) return;
+    const q=($cat('#nxCategorySearch')?.value||'').trim().toLowerCase();
+    const rows=categoryRows(name).filter(r=>!q||String(r.searchFields||'').toLowerCase().includes(q));
+    const count=$cat('#nxCategoryCount'); if(count) count.textContent=`${fmt(rows.length)} records`;
+    const result=$cat('#nxCategoryResults'); if(result) result.innerHTML=resultsHtml(rows,'loadCatalogueCategoryMore');
+  }
   function provenancePage() {
     const rows=(C.snapshots||[]).map(s=>`<div class="nx-snapshot-row"><b>${escCat(s.snapshotDate)} · page ${s.apiPageNumber} of ${s.pagesInSnapshotAccordingToHeader}</b><span>Header count ${fmt(s.snapshotHeaderCount)} · supplied rows ${fmt(s.recordsInSuppliedPdfPart)} · ranks ${s.rankCoverage?.[0]}–${s.rankCoverage?.[1]}</span><span>${escCat(s.pdfFilename)}</span><span>Source: ${escCat(s.sourceName)} · ${escCat(s.sourceParameter)} · ${escCat(s.metric)}</span><span>URL: ${escCat(s.sourceUrl)} (${escCat(s.sourceUrlStatus)})</span><span>${fmt(s.partialExtractions)} partial extractions · ${fmt(s.missingNames)} missing names</span></div>`).join('');
     return `<div class="nx-intro"><div class="nx-eyebrow">DATA QUALITY & PROVENANCE</div><h2>Import provenance</h2><p>Every listing retains source filename, source name, inferred source URL, snapshot date, page number, header count and supplied coverage count.</p></div>
@@ -119,6 +166,8 @@
   pages.catalogueDetail=detailPage;
   pages.capabilityFamilies=familiesPage;
   pages.catalogueProvenance=provenancePage;
+  pages.catalogueCategory=categoryCataloguePage;
+  pageTitles.catalogueCategory='Category catalogue';
   pages.plugins=function(){
     const counts=all.reduce((o,r)=>(o[r.listingKind||'not supplied']=(o[r.listingKind||'not supplied']||0)+1,o),{});
     const connectors=counts.connector||0, apps=counts.app||0, plugins=counts.plugin||0;
@@ -135,6 +184,10 @@
       prefs.activePluginRecordId=element?.dataset?.recordId||''; save(); nav('catalogueDetail');
     } else if(action==='loadCatalogueMore'){
       catLimit+=40; updateCatalogueResults(false);
+    } else if(action==='browseCatalogueCategory'){
+      prefs.catalogueCategoryName=element?.dataset?.category||''; nav('catalogueCategory');
+    } else if(action==='loadCatalogueCategoryMore'){
+      catLimit+=40; updateCategoryResults(false);
     } else if(action==='filterByFamily'){
       const fid=element?.dataset?.family||''; prefs.catalogueInitialFamily=fid; nav('pluginCatalogue');
     } else baseCatalogueHandle(action,element);
@@ -154,6 +207,7 @@
 
   screen.addEventListener('input',e=>{
     if(e.target?.id==='nxCatalogueSearch') updateCatalogueResults(true);
+    if(e.target?.id==='nxCategorySearch') updateCategoryResults(true);
   });
   screen.addEventListener('change',e=>{
     if(['nxFamilyFilter','nxCategoryFilter','nxKindFilter','nxSnapshotFilter','nxStateFilter'].includes(e.target?.id)) updateCatalogueResults(true);
