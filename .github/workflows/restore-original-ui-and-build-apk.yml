@@ -41,7 +41,7 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Verify AppDeploy v24 UI and data-pack migration
+      - name: Verify Expert AI local UI and Railway backend
         shell: bash
         run: |
           set -euo pipefail
@@ -56,7 +56,7 @@ jobs:
           grep -q 'live-bridge.js' public/mobile-ui-pack/index.html
           ! test -e public/mobile-ui-pack/bootstrap.js
           test -s backend/railway/index.ts
-          echo "AppDeploy UI/data assets are local in this project; runtime no longer loads AppDeploy or its ZIP service."
+          echo "Expert AI UI/data assets are local; the app uses the Railway API for runtime services."
 
       - name: Install JavaScript dependencies
         run: npm ci --no-audit --no-fund
@@ -161,7 +161,7 @@ jobs:
             echo "- Version: **2.0.0 (code 2)**"
             echo "- Build: installable debug-signed APK"
             echo "- Backend: Railway"
-            echo "- AppDeploy runtime and ZIP bootstrap: removed from the Android runtime"
+            echo "- Railway runtime only; no external ZIP bootstrap is used by Android"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload APK artifact
