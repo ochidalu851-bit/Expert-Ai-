@@ -875,16 +875,6 @@
     persist,
     notify,
     getUser: () => activeUser,
-    setActivity: (label) => {
-      prefs.expertActivity = String(label || '');
-      persist();
-      render();
-    },
-    clearActivity: () => {
-      prefs.expertActivity = '';
-      persist();
-      render();
-    }
   };
   const expertEnhancements = document.createElement('script');
   expertEnhancements.src = '/mobile-ui-pack/expert-ai-upgrades.js?v=4-composer';
