@@ -133,14 +133,13 @@
   // Nested quick-action menus exactly matching the Add and Plugins sheets in the recording.
   const oldHandle8=handleAction;
   const addMenuLayerStyle = {
-    position:'fixed', left:'50%', right:'auto', top:'auto',
-    bottom:'calc(env(safe-area-inset-bottom, 0px) + 76px)',
-    transform:'translateX(-50%)',
-    width:'min(calc(100vw - 24px), 430px)',
-    height:'min(52vh, 370px)', minHeight:'0',
-    maxWidth:'430px', maxHeight:'min(52vh, 370px)',
+    position:'fixed', left:'12px', right:'auto', top:'auto',
+    bottom:'12px', transform:'none',
+    width:'min(246px, calc(100vw - 24px))',
+    height:'min(304px, calc(100dvh - 150px))', minHeight:'0',
+    maxWidth:'246px', maxHeight:'min(304px, calc(100dvh - 150px))',
     overflow:'visible', display:'flex',
-    alignItems:'stretch', justifyContent:'center',
+    alignItems:'stretch', justifyContent:'flex-start',
     padding:'0', margin:'0', background:'transparent',
     border:'0', borderRadius:'0', boxShadow:'none',
     zIndex:'100000', pointerEvents:'auto', isolation:'isolate'
@@ -173,17 +172,33 @@
       ['Think harder','v8ThinkHarder','think']
     ];
     modalLayer.innerHTML=`<section class="expert-add-sheet" role="dialog" aria-label="Add to message">${items.map(([label,action,icon])=>`<button type="button" class="expert-add-option" data-action="${action}" aria-label="${label}"><span class="expert-add-icon">${icons[icon]}</span><span class="expert-add-label">${label}</span></button>`).join('')}</section>`;
-    applyImportantStyles(modalLayer,addMenuLayerStyle);
+    const composer=screen.querySelector('.chat-composer');
+    const plusButton=composer?.querySelector('[data-action="composerPlus"]');
+    const composerRect=composer?.getBoundingClientRect();
+    const plusRect=plusButton?.getBoundingClientRect();
+    const viewportWidth=window.innerWidth||320;
+    const viewportHeight=window.innerHeight||640;
+    const menuWidth=Math.min(246,Math.max(220,viewportWidth-24));
+    const menuHeight=Math.min(304,Math.max(250,viewportHeight-150));
+    const anchorLeft=plusRect?plusRect.left:12;
+    const left=Math.max(12,Math.min(anchorLeft,viewportWidth-menuWidth-12));
+    const bottom=composerRect?Math.max(10,viewportHeight-composerRect.bottom):12;
+    applyImportantStyles(modalLayer,{
+      ...addMenuLayerStyle,
+      left:left+'px',bottom:bottom+'px',
+      width:menuWidth+'px',height:menuHeight+'px',
+      maxWidth:menuWidth+'px',maxHeight:menuHeight+'px'
+    });
     modalLayer.dataset.expertAddMenu='true';
     const sheet=modalLayer.querySelector('.expert-add-sheet');
     applyImportantStyles(sheet,{
       display:'flex',flexDirection:'column',gap:'0',
       position:'relative',width:'100%',height:'100%',minHeight:'0',
-      maxWidth:'430px',maxHeight:'100%',overflow:'hidden',
-      boxSizing:'border-box',margin:'0',padding:'6px 10px 8px',
+      maxWidth:'100%',maxHeight:'100%',overflow:'hidden',
+      boxSizing:'border-box',margin:'0',padding:'6px 8px',
       background:'#303030',color:'#f7f7f7',
-      border:'1px solid #464646',borderRadius:'26px',
-      boxShadow:'0 12px 30px rgba(0,0,0,.42)',
+      border:'1px solid #464646',borderRadius:'25px',
+      boxShadow:'0 10px 26px rgba(0,0,0,.38)',
       fontFamily:'Roboto,"Helvetica Neue",Arial,sans-serif',
       fontStyle:'normal',textAlign:'left',transform:'none',
       pointerEvents:'auto'
@@ -193,12 +208,12 @@
         appearance:'none',WebkitAppearance:'none',
         display:'flex',width:'100%',minHeight:'0',height:'auto',
         flex:'1 1 0',alignItems:'center',justifyContent:'flex-start',
-        gap:'14px',margin:'0',padding:'4px 8px',
+        gap:'11px',margin:'0',padding:'3px 6px',
         border:'0',borderRadius:'16px',background:'transparent',
         color:'#f7f7f7',boxShadow:'none',outline:'none',
         fontFamily:'Roboto,"Helvetica Neue",Arial,sans-serif',
-        fontSize:'18px',fontStyle:'normal',fontWeight:'500',
-        letterSpacing:'-.25px',lineHeight:'1.2',textAlign:'left',
+        fontSize:'16px',fontStyle:'normal',fontWeight:'500',
+        letterSpacing:'-.2px',lineHeight:'1.2',textAlign:'left',
         textDecoration:'none',textShadow:'none',whiteSpace:'normal',
         cursor:'pointer',opacity:'1',visibility:'visible',
         colorScheme:'dark',forcedColorAdjust:'none',
@@ -206,16 +221,16 @@
       });
       const icon=button.querySelector('.expert-add-icon');
       applyImportantStyles(icon,{
-        display:'flex',flex:'0 0 52px',width:'52px',height:'52px',
-        minWidth:'52px',minHeight:'52px',alignItems:'center',
+        display:'flex',flex:'0 0 42px',width:'42px',height:'42px',
+        minWidth:'42px',minHeight:'42px',alignItems:'center',
         justifyContent:'center',borderRadius:'50%',
         background:'#3b3b3b',color:'#fff',boxShadow:'none',
         padding:'0',margin:'0',opacity:'1',visibility:'visible'
       });
       const svg=icon.querySelector('svg');
       applyImportantStyles(svg,{
-        display:'block',width:'30px',height:'30px',
-        minWidth:'30px',minHeight:'30px',
+        display:'block',width:'27px',height:'27px',
+        minWidth:'27px',minHeight:'27px',
         fill:'none',stroke:'#fff',strokeWidth:'3.2',
         strokeLinecap:'round',strokeLinejoin:'round',
         overflow:'visible',opacity:'1',visibility:'visible'
@@ -231,8 +246,8 @@
         display:'block',flex:'1 1 auto',minWidth:'0',
         color:'#f7f7f7',
         fontFamily:'Roboto,"Helvetica Neue",Arial,sans-serif',
-        fontSize:'18px',fontStyle:'normal',fontWeight:'500',
-        letterSpacing:'-.25px',lineHeight:'1.2',
+        fontSize:'16px',fontStyle:'normal',fontWeight:'500',
+        letterSpacing:'-.2px',lineHeight:'1.2',
         textAlign:'left',textDecoration:'none',textShadow:'none',
         opacity:'1',visibility:'visible'
       });
