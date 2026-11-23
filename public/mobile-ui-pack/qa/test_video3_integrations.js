@@ -17,12 +17,16 @@ assert('directory renders 58 plugin rows', (html.match(/class="video-plugin-row"
 assert('directory renders 57 plus buttons', (html.match(/class="video-plugin-add/g)||[]).length===57);
 assert('Google Drive lock state appears',html.includes('data-plugin="Google Drive"')&&html.includes('video-plugin-lock'));
 assert('popular, new, and all capability groups appear',['Popular','New & noteworthy','Productivity','Communication','Creativity','Developer Tools','Fitness','Finance','Travel','Entertainment','Education','Business &amp; Operations','Data &amp; Analytics','Scientific Research','Security','Other'].every(x=>html.includes(x)));
-assert('Plugin Management detail has read/write actions',ctx.pages.videoPluginDetail().includes('get app permissions')&&ctx.pages.videoPluginDetail().includes('Uninstall app'));
+assert('Plugin Management detail keeps read/write actions but has no uninstall action',ctx.pages.videoPluginDetail().includes('get app permissions')&&ctx.pages.videoPluginDetail().includes('Update app permissions')&&!ctx.pages.videoPluginDetail().includes('Uninstall app'));
 assert('skill detail has use-skill switch and action guidance',ctx.pages.pluginManagementSkill().includes('pluginManagementSkillEnabled')&&ctx.pages.pluginManagementSkill().includes('get.plugin.dependencies'));
 assert('chat page has response toolbar controls',ctx.pages.chat().includes('video-message-toolbar'));
 assert('customize shows real initial installed count',ctx.pages.customize().includes('1 added'));
 assert('permissions page shows Plugin Management only initially',ctx.pages.permissions().includes('Plugin Management')&&!ctx.pages.permissions().includes('AppDeploy'));
 assert('installed apps page lists Plugin Management',ctx.pages.videoInstalledApps().includes('Plugin Management'));
+ctx.handleAction('toggleVideoPlugin',{dataset:{plugin:'Plugin Management'}});
+assert('Plugin Management cannot be removed by the plugin toggle',prefs.videoPluginAdded?.includes('Plugin Management'));
+ctx.handleAction('videoPluginModalChoice',{dataset:{modalValue:'uninstallManager'}});
+assert('Legacy uninstall action cannot remove Plugin Management',prefs.videoPluginAdded?.includes('Plugin Management'));
 console.log('Directory inventory',JSON.stringify(ctx.window.NEXA_VIDEO_PLUGIN_DIRECTORY));
 ctx.handleAction('toggleVideoPlugin',{dataset:{plugin:'GitHub'}});
 assert('plus action adds GitHub without navigation',prefs.videoPluginAdded.includes('GitHub')&&currentPage==='home');
