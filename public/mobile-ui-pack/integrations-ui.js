@@ -82,15 +82,6 @@
   const catalogueCategoryCountsV = Object.fromEntries(Object.entries(catalogueCategorySourcesV).map(([label,source])=>[
     label,catalogueRecordsV.filter(record=>(record.categories||[]).some(value=>source.includes(String(value).toLowerCase()))).length
   ]));
-  function catalogueBrowseButtonV(label){
-    const count=catalogueCategoryCountsV[label]||0;
-    if(!count)return '';
-    const detail=label==='Fitness'?'Health & wellness records · source category: Healthcare':
-      label==='Education'?'Includes records labelled Education & research':
-      label==='Data & Analytics'?'Includes the source label Analytics':
-      'Browse the full source catalogue category';
-    return `<button class="video-catalogue-browse" type="button" data-action="browseCatalogueCategory" data-category="${escV(label)}"><span class="video-catalogue-browse-main"><b>Browse all ${count.toLocaleString()} records</b><small>${escV(detail)}</small></span><span class="video-catalogue-browse-arrow">›</span></button>`;
-  }
   const byName = new Map();
   groupsV.forEach(g=>g.items.forEach(a=>byName.set(a[0],{name:a[0],description:a[1],icon:a[2],locked:a[3]==='locked',image:a[4]||'',category:g.name,source:'Supplied screen recording · 2026-11-10'})));
   newNoteworthy.forEach(a=>byName.set(a[0],{name:a[0],description:a[1],icon:a[2],locked:false,image:'',category:'New & noteworthy',source:'Supplied screen recording · 2026-11-10'}));
@@ -133,15 +124,21 @@
     return `<div class="video-plugin-page">
       <div class="video-plugin-section-head"><button data-action="openVideoPluginInstalled">Installed <span>›</span></button></div>
       ${installedCard()}
-      ${groupsV.slice(0,1).map(g=>`<section class="video-plugin-category video-popular"><button class="video-plugin-section-head" data-action="toggleVideoPluginCategory" data-category="${escV(g.name)}"><span>${escV(g.name)}</span><span>${hidden[g.name]?'＋':'›'}</span></button><div class="video-plugin-items" ${hidden[g.name]?'hidden':''}>${g.items.map(a=>itemRow(byName.get(a[0]))).join('')}</div></section>`).join('')}
-      <section class="video-plugin-category"><button class="video-plugin-section-head" data-page="newNoteworthy"><span>New & noteworthy</span><span>›</span></button><div class="video-plugin-items">${newNoteworthy.map(a=>itemRow(byName.get(a[0]))).join('')}</div></section>
+      ${groupsV.slice(0,1).map(g=>`<section class="video-plugin-category video-popular"><button class="video-plugin-section-head" data-page="videoPopular"><span>${escV(g.name)}</span><span>4</span><span>›</span></button></section>`).join('')}
+      <section class="video-plugin-category"><button class="video-plugin-section-head" data-page="newNoteworthy"><span>New & noteworthy</span><span>2</span><span>›</span></button></section>
       ${groupsV.slice(1).map(g=>{
         const title=g.name;
-        return `<section class="video-plugin-category"><button class="video-plugin-section-head" data-action="toggleVideoPluginCategory" data-category="${escV(title)}"><span>${escV(title)}</span><span>${hidden[title]?'＋':'›'}</span></button><div class="video-plugin-items" ${hidden[title]?'hidden':''}>${g.items.map(a=>itemRow(byName.get(a[0]))).join('')}${catalogueBrowseButtonV(title)}</div></section>`;
+        const count=catalogueCategoryCountsV[title]||0;
+        return `<section class="video-plugin-category"><button class="video-plugin-section-head" data-action="browseCatalogueCategory" data-category="${escV(title)}"><span>${escV(title)}</span><span>${count.toLocaleString()}</span><span>›</span></button></section>`;
       }).join('')}
       <div class="video-plugin-footer-links"><button class="outline" data-page="capabilityFamilies">12 capability families</button></div>
       <div class="search-dock video-plugin-search"><span>⌕</span><input id="pluginSearch" placeholder="Search plugins" autocomplete="off"></div>
     </div>`;
+  }
+  function popularPluginsPage(){
+    const items=groupsV[0].items;
+    return `<div class="video-plugin-section-head static-head">Popular</div><div class="video-plugin-items">${items.map(a=>itemRow(byName.get(a[0]))).join('')}</div>
+      <div class="video-plugin-footer-links"><button class="outline" data-page="plugins">Back to Plugins</button></div>`;
   }
   function newNoteworthyPage(){
     return `<div class="video-plugin-section-head static-head">New & noteworthy</div><div class="video-plugin-items">${newNoteworthy.map(a=>itemRow(byName.get(a[0]))).join('')}</div>
@@ -282,7 +279,7 @@
   }
   const pluginIconByName = n => byName.get(n)||{name:n,description:'Plugin Management skills and actions',icon:'✣',category:'Installed'};
 
-  pageTitles.plugins='Plugins'; pageTitles.newNoteworthy='New & noteworthy'; pageTitles.videoInstalledApps='Installed apps'; pageTitles.videoPluginDetail='Plugin details';
+  pageTitles.plugins='Plugins'; pageTitles.videoPopular='Popular'; pageTitles.newNoteworthy='New & noteworthy'; pageTitles.videoInstalledApps='Installed apps'; pageTitles.videoPluginDetail='Plugin details';
   pageTitles.pluginManagementSkill='plugin-management';pageTitles.chatUploads='Uploaded files';pageTitles.findInChat='Find in chat';pageTitles.archivedChats='Archived chats';
   pages.plugins=videoPluginsPage;
   const previousCustomizePage=pages.customize;
@@ -291,6 +288,7 @@
     const names=getAdded();
     return `<div class="video-plugin-detail">${section('Preferences')}<div class="video-plugin-info"><button class="video-plugin-action-row" data-action="permissionMode"><span>Permissions</span><small>${escV(prefs.permissionMode||'Allow low-risk actions')}</small><span>›</span></button></div>${section('Added')}<div class="video-plugin-info">${names.map(n=>`<button class="video-plugin-action-row" data-action="openVideoPluginDetail" data-plugin="${escV(n)}"><span>${escV(n)}</span><span>›</span></button>`).join('')||'<p class="nx-empty">No apps added.</p>'}</div><button class="outline" data-page="plugins">Browse plugins</button></div>`;
   };
+  pages.videoPopular=popularPluginsPage;
   pages.newNoteworthy=newNoteworthyPage;
   pages.videoInstalledApps=installedAppsPage;
   pages.videoPluginDetail=detailPage;
