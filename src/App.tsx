@@ -7,6 +7,7 @@ async function railwayRequest(path: string, method = 'GET', body?: unknown) {
   const headers = new Headers({ accept: 'application/json' });
   const token = localStorage.getItem(SESSION_KEY);
   if (token) headers.set('authorization', 'Bearer ' + token);
+  if (path === '/api/network/status') headers.set('x-railway-debug', '1');
   if (body !== undefined) headers.set('content-type', 'application/json');
   const response = await fetch(apiUrl(path), { method, headers, credentials: 'same-origin', body: body === undefined ? undefined : JSON.stringify(body) });
   const data = await response.json().catch(() => ({}));
@@ -14,6 +15,10 @@ async function railwayRequest(path: string, method = 'GET', body?: unknown) {
     const reason = new Error(String(data?.error || 'The Expert AI service request failed.')) as Error & { status?: number };
     reason.status = response.status;
     throw reason;
+  }
+  if (path === '/api/network/status' && data && typeof data === 'object') {
+    data.railwayEdge = response.headers.get('x-railway-edge') || data.route?.edgePop || null;
+    data.upstreamZone = response.headers.get('x-railway-upstream-zone') || data.route?.upstreamZone || null;
   }
   return data;
 }
@@ -344,6 +349,28 @@ function App() {
               voiceId: String(payload.voiceId || ''),
             })).data;
             break;
+          case 'network.status':
+            data = (await api.get('/api/network/status')).data;
+            break;
+          case 'network.download': {
+            const file = (await api.post('/api/network/download', { url: String(payload.url || '') })).data;
+            const downloadToken = localStorage.getItem(SESSION_KEY);
+            const downloadHeaders = new Headers({ accept: '*/*' });
+            if (downloadToken) downloadHeaders.set('authorization', 'Bearer ' + downloadToken);
+            const fileResponse = await fetch(apiUrl('/api/files/' + encodeURIComponent(String(file.id || '')) + '/download'), { headers: downloadHeaders, credentials: 'same-origin' });
+            if (!fileResponse.ok) throw new Error('The downloaded file was saved, but the browser could not retrieve it from Expert AI storage.');
+            const fileBlob = await fileResponse.blob();
+            const blobUrl = URL.createObjectURL(fileBlob);
+            const anchor = document.createElement('a');
+            anchor.href = blobUrl;
+            anchor.download = String(file.name || 'download.bin');
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+            data = { ...file, downloaded: true };
+            break;
+          }
           case 'preferences.load':
             data = (await api.get('/api/preferences')).data;
             break;
