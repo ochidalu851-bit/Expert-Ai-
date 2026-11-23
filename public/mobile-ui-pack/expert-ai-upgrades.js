@@ -204,7 +204,7 @@
     let html = brandedHome();
     html = html.replace(/(<button[^>]*data-action="voiceInput"[^>]*>[\s\S]*?<\/button>)/i, thinkButton() + '$1');
     html = html.replace(/data-page="voiceMode"/g, 'data-page="expertVoiceChat"');
-    html = html.replace(/<div class="chat-composer/, recordingMarkup() + '<div class="chat-composer');
+    html = html.replace(/<div class="chat-composer([^"]*)">/, recordingMarkup() + '<div class="chat-composer$1 expert-fixed-composer">');
     return emphasizeComposerControls(html);
   };
 
