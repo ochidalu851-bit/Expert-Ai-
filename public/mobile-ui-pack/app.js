@@ -843,3 +843,21 @@ pages.emailLogin = function(){
 pages.phoneLogin = function(){
   return `${section('Country / region')}<button class="pill" data-page="countrySelector">${esc(prefs.countryCode||'Nigeria +234')} <span>⌄</span></button><input class="field" id="phoneNumber" placeholder="Phone number" inputmode="tel"><button class="primary" data-action="phoneContinue">Continue</button><button class="outline" data-page="emailLogin">Continue with email</button><p class="small-muted center">This is a local sign-in flow preview only.</p>`;
 };
+
+
+/* Expert AI Railway composer correction: activate the visible composer on the actual screens. */
+pages.home = function expertHomePageWithComposer() {
+  return `<div class="home-space"></div>
+    <div class="home-shortcuts">
+      <button data-page="images"><span>▧</span> Create an image or sticker</button>
+      <button data-page="chat"><span>✎</span> Write or edit</button>
+    </div>
+    <div class="chat-composer" role="group" aria-label="Message composer">
+      <button type="button" data-action="composerPlus" aria-label="Add attachment">＋</button>
+      <input id="homePrompt" placeholder="Ask Expert AI" aria-label="Message Expert AI" autocomplete="off">
+      <button type="button" data-action="voiceInput" aria-label="Voice recognition">♩</button>
+      <button type="button" class="voice-send" data-page="voiceMode" aria-label="Start voice chat">◖</button>
+      <button type="button" class="send-button" data-action="sendHome" aria-label="Send message">↑</button>
+    </div>`;
+};
+pages.chat = v4ChatPage;
