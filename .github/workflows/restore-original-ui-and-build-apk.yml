@@ -24,11 +24,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - name: Check out migrated Expert AI source
-        uses: actions/checkout@v4
-        with:
-          token: ${{ github.token }}
-          fetch-depth: 0
+      - name: Fetch the public Expert AI source (no GitHub app installation required)
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch main https://github.com/ochidalu851-bit/Expert-Ai-.git .
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -155,7 +155,7 @@ jobs:
           {
             echo "## Expert AI Android APK"
             echo ""
-            echo "- APK size: **\${MB} MB**"
+            echo "- APK size: **${MB} MB**"
             echo "- Package: **ai.expertai.railway**"
             echo "- Android minimum: **7.0 (API 24)**"
             echo "- Version: **2.0.0 (code 2)**"
