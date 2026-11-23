@@ -71,7 +71,8 @@
     });
     if (Object.keys(fields).length) prefs.expertDrafts[page] = fields;
     prefs.expertScroll = prefs.expertScroll || {};
-    prefs.expertScroll[page] = screen.scrollTop || 0;
+    const scrollRoot = page === 'chat' ? screen.querySelector('.chat-thread') : screen;
+    prefs.expertScroll[page] = scrollRoot ? scrollRoot.scrollTop : 0;
     persist();
   }
 
@@ -82,7 +83,10 @@
       if (el && el !== document.activeElement && el.type !== 'file') el.value = fields[id];
     });
     const scroll = prefs.expertScroll && prefs.expertScroll[page];
-    if (typeof scroll === 'number') window.requestAnimationFrame(() => { screen.scrollTop = scroll; });
+    if (typeof scroll === 'number') window.requestAnimationFrame(() => {
+      const scrollRoot = page === 'chat' ? screen.querySelector('.chat-thread') : screen;
+      if (scrollRoot) scrollRoot.scrollTop = scroll;
+    });
   }
 
   const originalNav = nav;
@@ -98,28 +102,23 @@
   const originalRender = render;
   render = function() {
     const preserveChatScroll = currentPage === 'chat' && screen.dataset.expertLastRenderedPage === 'chat';
-    const previousChatScroll = screen.scrollTop;
-    const wasNearChatBottom = screen.scrollHeight - screen.clientHeight - previousChatScroll < 120;
+    const previousThread = currentPage === 'chat' ? screen.querySelector('.chat-thread') : null;
+    const previousChatScroll = previousThread ? previousThread.scrollTop : 0;
+    const wasNearChatBottom = previousThread
+      ? previousThread.scrollHeight - previousThread.clientHeight - previousChatScroll < 120
+      : true;
     originalRender();
+    screen.dataset.expertChatLayout = currentPage === 'chat' ? 'true' : 'false';
     brandStaticText();
-    if (currentPage === 'chat') decorateChatProgress();
     restoreDrafts(currentPage);
     if (preserveChatScroll) {
       window.requestAnimationFrame(() => {
         if (currentPage !== 'chat') return;
-        screen.scrollTop = wasNearChatBottom ? screen.scrollHeight : previousChatScroll;
+        const thread = screen.querySelector('.chat-thread');
+        if (thread) thread.scrollTop = wasNearChatBottom ? thread.scrollHeight : previousChatScroll;
       });
     }
     screen.dataset.expertLastRenderedPage = currentPage;
-    if (prefs.expertActivity && currentPage !== 'chat' && !screen.querySelector('.expert-activity-global')) {
-      const item = document.createElement('div');
-      item.className = 'expert-activity expert-activity-global';
-      const pulse = document.createElement('span');
-      pulse.className = 'expert-pulse';
-      item.appendChild(pulse);
-      item.appendChild(document.createTextNode(String(prefs.expertActivity)));
-      screen.insertBefore(item, screen.firstChild);
-    }
   };
   document.addEventListener('input', event => {
     const el = event.target;
@@ -164,14 +163,6 @@
     }
     return '';
   }
-  const statusMarkup = () => {
-    const queue = readOutbox().filter(item => (prefs.temporaryChat ? item.temporary : !item.temporary));
-    const activity = prefs.expertActivity ? '<div class="expert-activity"><span class="expert-pulse"></span>' + esc(prefs.expertActivity) + '</div>' : '';
-    const pending = queue.map(item => '<div class="expert-activity"><span class="expert-pulse"></span>' +
-      esc(item.status || 'Waiting to send…') + '</div>').join('');
-    return activity + pending;
-  };
-
   /* High-visibility composer controls: recorder, live voice chat and send. */
   const composerMicIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"></path></svg>';
   const composerVoiceIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4M7 7v10M11 4v16M15 7v10M19 10v4M22 11v2"></path></svg>';
@@ -215,13 +206,17 @@
     '.expert-think-toggle svg{display:block;width:18px;height:18px;pointer-events:none}.expert-think-toggle.is-active{box-shadow:0 0 0 3px rgba(91,131,255,.16)}',
     '.chat-thread .chat-bubble{font-size:15px;font-weight:400;line-height:1.55}',
     '.chat-thread .user-bubble{display:block!important;width:fit-content!important;max-width:76%!important;min-width:0!important;box-sizing:border-box!important;white-space:pre-wrap;overflow-wrap:anywhere;font-weight:400!important}',
-    '.expert-send-status{display:flex;align-items:center;gap:7px;width:max-content;max-width:76%;margin:4px 0 8px auto;padding:3px 7px;color:#a6a6a6;font-size:11px;line-height:1.4;background:transparent}',
-    '.expert-send-dot{width:7px;height:7px;flex:0 0 7px;border-radius:50%;background:var(--expert-accent);animation:expertPulse 1.1s ease-in-out infinite}',
-    '.expert-ai-thinking{display:flex;align-items:center;align-self:flex-start;gap:9px;margin:6px 0 10px 2px;color:#b8b8b8;font-size:13px;line-height:1.4}',
-    '.expert-thinking-indicator{display:inline-flex;align-items:center;gap:3px;height:14px}',
-    '.expert-thinking-indicator i{display:block;width:5px;height:5px;border-radius:50%;background:var(--expert-accent);animation:expertThink 1s ease-in-out infinite}',
-    '.expert-thinking-indicator i:nth-child(2){animation-delay:.15s}.expert-thinking-indicator i:nth-child(3){animation-delay:.3s}',
-    '@keyframes expertThink{0%,60%,100%{opacity:.35;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}',
+    '#screen[data-expert-chat-layout="true"]{display:flex!important;flex-direction:column!important;min-height:0!important;overflow:hidden!important;padding:0 20px!important;scrollbar-width:none!important}',
+    '#screen[data-expert-chat-layout="true"] .chat-thread{display:flex!important;flex:1 1 auto!important;flex-direction:column!important;align-items:stretch!important;min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain!important;padding:12px 0 16px!important;margin:0!important;scrollbar-width:none!important}',
+    '#screen[data-expert-chat-layout="true"] .chat-welcome{display:flex!important;flex:1 1 auto!important;min-height:0!important;flex-direction:column!important;justify-content:center!important;align-items:center!important}',
+    '#screen[data-expert-chat-layout="true"] .chat-message-wrap{display:flex!important;flex:0 0 auto!important;flex-direction:column!important;align-items:flex-start!important;width:100%!important;max-width:100%!important;margin:0 0 12px!important}',
+    '#screen[data-expert-chat-layout="true"] .chat-message-wrap.user-message-wrap{align-items:flex-end!important}',
+    '#screen[data-expert-chat-layout="true"] .chat-message-wrap.assistant-message-wrap{align-items:flex-start!important}',
+    '#screen[data-expert-chat-layout="true"] .chat-message-wrap .user-bubble{align-self:flex-end!important;margin-left:auto!important;margin-right:0!important}',
+    '#screen[data-expert-chat-layout="true"] .chat-message-wrap .assistant-bubble{align-self:flex-start!important;margin-left:0!important;margin-right:auto!important}',
+    '#screen[data-expert-chat-layout="true"] .video-message-toolbar{align-self:flex-start!important;margin-left:0!important}',
+    '#screen[data-expert-chat-layout="true"] .chat-composer.expert-fixed-composer{position:relative!important;inset:auto!important;bottom:auto!important;align-self:stretch!important;flex:0 0 auto!important;width:100%!important;margin:8px 0 calc(env(safe-area-inset-bottom,0px) + 8px)!important;z-index:20!important}',
+    '#screen[data-expert-chat-layout="true"] .expert-recorder-bar,#screen[data-expert-chat-layout="true"] .v7-attachment-chips,#screen[data-expert-chat-layout="true"] .v8-composer-tools{flex:0 0 auto!important}',
     '.expert-ad-toggle{display:flex!important;grid-template-columns:none!important;flex-direction:row-reverse;justify-content:space-between;width:100%;align-items:center;gap:12px;padding:9px 0;color:#eee!important;font-size:14px!important;cursor:pointer}',
     '.expert-ad-toggle input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}',
     '.expert-ad-track{width:46px;height:26px;flex:0 0 46px;border-radius:30px;background:#555;position:relative;transition:background .18s ease}',
@@ -234,8 +229,6 @@
     '.chat-composer.nexa-composer.expert-fixed-composer{position:sticky;z-index:35!important}',
     '.expert-ad-toggle .expert-ad-track{flex:0 0 46px}',
     '.expert-recorder-bar{display:flex;align-items:center;gap:9px;margin:8px 4px;padding:10px 12px;border-radius:14px;background:#252525;color:#eee;font-size:12px}.expert-recorder-bar span:nth-child(2){flex:1}.expert-recorder-bar button{border:0;border-radius:10px;padding:7px 12px;background:#454545;color:#fff;font-weight:800}.expert-recorder-bar.is-recording{background:#321d20;color:#fff}.expert-recorder-bar.is-ready{background:#1e2b25}.expert-recorder-dot{width:9px;height:9px;flex:0 0 9px;border-radius:50%;background:#f04452}.expert-recorder-bar.is-recording .expert-recorder-dot{animation:expertPulse .9s infinite}.expert-recorder-bar.is-ready .expert-recorder-dot{background:#35b879}',
-    '.expert-activity{display:flex;align-items:center;gap:9px;margin:8px 4px;padding:8px 12px;border-radius:13px;background:#191919;color:#d6d6d6;font-size:12px}',
-    '.expert-pulse{width:8px;height:8px;flex:0 0 8px;border-radius:50%;background:var(--expert-accent);animation:expertPulse 1.2s ease-in-out infinite}',
     '@keyframes expertPulse{50%{opacity:.28;transform:scale(.75)}}',
     '.expert-form{display:grid;gap:10px;padding:15px}.expert-form label{display:grid;gap:6px;color:#aaa;font-size:13px}.expert-form input,.expert-form select,.expert-form textarea{width:100%;padding:12px;border:1px solid #414141;border-radius:12px;background:#151515;color:#fff;font:inherit}.expert-form button,.expert-action{min-height:44px;border:0;border-radius:13px;background:var(--expert-accent);color:#fff;padding:10px 14px;font-weight:700}',
     '.expert-avatar{width:78px;height:78px;object-fit:cover;border-radius:50%;border:2px solid var(--expert-accent);background:#282828}',
@@ -277,56 +270,6 @@
   }
   function writeOutbox(items) {
     localStorage.setItem(outboxKey(), JSON.stringify(items));
-  }
-  function decorateChatProgress() {
-    if (currentPage !== 'chat' || !screen) return;
-    const thread = screen.querySelector('.chat-thread');
-    if (!thread) return;
-    thread.querySelectorAll('.expert-send-status,.expert-ai-thinking').forEach(node => node.remove());
-    const pending = readOutbox().filter(item =>
-      (prefs.temporaryChat || prefs.saveHistory === false ? item.temporary : !item.temporary) &&
-      (!item.sessionKey || item.sessionKey === prefs.activeConversationToken)
-    );
-    const bubbles = Array.from(thread.querySelectorAll('.user-bubble'));
-    const matched = new Set();
-    const normalize = value => String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
-    pending.slice().reverse().forEach(item => {
-      const expected = normalize(item.text);
-      const bubble = bubbles.slice().reverse().find(node => {
-        if (matched.has(node)) return false;
-        const actual = normalize(node.textContent);
-        return expected && (actual === expected || actual.includes(expected) || expected.includes(actual.slice(0, 48)));
-      }) || bubbles.slice().reverse().find(node => !matched.has(node));
-      if (!bubble) return;
-      matched.add(bubble);
-      const status = document.createElement('div');
-      status.className = 'expert-send-status';
-      status.dataset.clientId = item.id;
-      const dot = document.createElement('span');
-      dot.className = 'expert-send-dot';
-      dot.setAttribute('aria-hidden', 'true');
-      const label = document.createElement('span');
-      label.textContent = item.status || 'Sending…';
-      status.append(dot, label);
-      bubble.insertAdjacentElement('afterend', status);
-    });
-    if (prefs.expertAIThinking && pending.length) {
-      const thinking = document.createElement('div');
-      thinking.className = 'expert-ai-thinking';
-      const indicator = document.createElement('span');
-      indicator.className = 'expert-thinking-indicator';
-      indicator.setAttribute('aria-hidden', 'true');
-      indicator.innerHTML = '<i></i><i></i><i></i>';
-      const label = document.createElement('span');
-      label.textContent = 'Thinking';
-      thinking.append(indicator, label);
-      const latestPending = pending[pending.length - 1];
-      const status = thread.querySelector('.expert-send-status[data-client-id="' + latestPending.id + '"]');
-      const latestBubble = bubbles[bubbles.length - 1];
-      const anchor = status || latestBubble;
-      if (anchor) anchor.insertAdjacentElement('afterend', thinking);
-      else thread.appendChild(thinking);
-    }
   }
   function showBackgroundReply(message) {
     if (!document.hidden || !('Notification' in window) || Notification.permission !== 'granted') return;
