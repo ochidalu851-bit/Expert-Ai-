@@ -62,6 +62,35 @@
   const newNoteworthy = [
     ['iCloud Mail','Read and manage iCloud email','✉'],['iCloud Calendar','Read and manage iCloud events','1']
   ];
+  const catalogueCategorySourcesV = {
+    'Productivity':['productivity'],
+    'Communication':['communication'],
+    'Creativity':['creativity'],
+    'Developer Tools':['developer tools'],
+    'Fitness':['healthcare'],
+    'Finance':['finance'],
+    'Travel':['travel'],
+    'Entertainment':['entertainment'],
+    'Education':['education & research'],
+    'Business & Operations':['business & operations'],
+    'Data & Analytics':['data & analytics','analytics'],
+    'Scientific Research':['scientific research'],
+    'Security':['security'],
+    'Other':['other']
+  };
+  const catalogueRecordsV = window.NEXA_PLUGIN_CATALOGUE?.records || [];
+  const catalogueCategoryCountsV = Object.fromEntries(Object.entries(catalogueCategorySourcesV).map(([label,source])=>[
+    label,catalogueRecordsV.filter(record=>(record.categories||[]).some(value=>source.includes(String(value).toLowerCase()))).length
+  ]));
+  function catalogueBrowseButtonV(label){
+    const count=catalogueCategoryCountsV[label]||0;
+    if(!count)return '';
+    const detail=label==='Fitness'?'Health & wellness records · source category: Healthcare':
+      label==='Education'?'Includes records labelled Education & research':
+      label==='Data & Analytics'?'Includes the source label Analytics':
+      'Browse the full source catalogue category';
+    return `<button class="video-catalogue-browse" type="button" data-action="browseCatalogueCategory" data-category="${escV(label)}"><span class="video-catalogue-browse-main"><b>Browse all ${count.toLocaleString()} records</b><small>${escV(detail)}</small></span><span class="video-catalogue-browse-arrow">›</span></button>`;
+  }
   const byName = new Map();
   groupsV.forEach(g=>g.items.forEach(a=>byName.set(a[0],{name:a[0],description:a[1],icon:a[2],locked:a[3]==='locked',image:a[4]||'',category:g.name,source:'Supplied screen recording · 2026-11-10'})));
   newNoteworthy.forEach(a=>byName.set(a[0],{name:a[0],description:a[1],icon:a[2],locked:false,image:'',category:'New & noteworthy',source:'Supplied screen recording · 2026-11-10'}));
@@ -108,9 +137,9 @@
       <section class="video-plugin-category"><button class="video-plugin-section-head" data-page="newNoteworthy"><span>New & noteworthy</span><span>›</span></button><div class="video-plugin-items">${newNoteworthy.map(a=>itemRow(byName.get(a[0]))).join('')}</div></section>
       ${groupsV.slice(1).map(g=>{
         const title=g.name;
-        return `<section class="video-plugin-category"><button class="video-plugin-section-head" data-action="toggleVideoPluginCategory" data-category="${escV(title)}"><span>${escV(title)}</span><span>${hidden[title]?'＋':'›'}</span></button><div class="video-plugin-items" ${hidden[title]?'hidden':''}>${g.items.map(a=>itemRow(byName.get(a[0]))).join('')}</div></section>`;
+        return `<section class="video-plugin-category"><button class="video-plugin-section-head" data-action="toggleVideoPluginCategory" data-category="${escV(title)}"><span>${escV(title)}</span><span>${hidden[title]?'＋':'›'}</span></button><div class="video-plugin-items" ${hidden[title]?'hidden':''}>${g.items.map(a=>itemRow(byName.get(a[0]))).join('')}${catalogueBrowseButtonV(title)}</div></section>`;
       }).join('')}
-      <div class="video-plugin-footer-links"><button class="outline" data-page="pluginCatalogue">Search complete catalogue · 12,618 records</button><button class="outline" data-page="capabilityFamilies">12 capability families</button></div>
+      <div class="video-plugin-footer-links"><button class="outline" data-page="capabilityFamilies">12 capability families</button></div>
       <div class="search-dock video-plugin-search"><span>⌕</span><input id="pluginSearch" placeholder="Search plugins" autocomplete="off"></div>
     </div>`;
   }
