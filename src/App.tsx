@@ -504,7 +504,7 @@ function App() {
       <iframe
         ref={frameRef}
         className="expert-mobile-app"
-        src="/mobile-ui-pack/index.html?v=expert-original-plugin-layout-20261123"
+        src="/mobile-ui-pack/index.html?v=network-settings-top-entry-20261123"
         title="Expert AI"
         allow="camera; microphone; clipboard-read; clipboard-write; geolocation; web-share"
       />
