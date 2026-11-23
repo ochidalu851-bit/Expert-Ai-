@@ -61,8 +61,8 @@
       return true;
     });
   }
-  function resultsHtml(rows, moreAction='loadCatalogueMore') {
-    const shown=rows.slice(0,catLimit);
+  function resultsHtml(rows, moreAction='loadCatalogueMore', showAll=false) {
+    const shown=showAll?rows:rows.slice(0,catLimit);
     const cards=shown.map(r=>{
       const icon=r.sourceIconUrl ? `<img class="nx-app-icon" src="${escCat(r.sourceIconUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<span class="nx-app-icon nx-icon-fallback">${escCat((recordName(r)[0]||'•').toUpperCase())}</span>`;
       const families=(r.capabilityFamilyIds||[]).slice(0,2).map(fid=>famById[fid]?.name).filter(Boolean);
@@ -72,7 +72,7 @@
         ${icon}<span class="nx-result-main"><strong>${escCat(recordName(r))}</strong><small>${escCat(recordPublisher(r))} · ${escCat((r.categories||[]).join(', ')||'Category not supplied')}</small><small>${escCat(r.description||'Description not supplied / not verified')}</small><span class="nx-result-tags">${chip(state)}${families.map(f=>chip(f)).join('')}${chip(snapdates,'nx-muted')}</span></span><span class="nx-result-arrow">›</span>
       </button>`;
     }).join('');
-    return `${cards || `<div class="nx-empty">No catalogue entries match these filters.</div>`}${rows.length>shown.length?`<button class="outline nx-more" data-action="${moreAction}">Show next 40 (${fmt(rows.length-shown.length)} remaining)</button>`:''}`;
+    return `${cards || `<div class="nx-empty">No catalogue entries match these filters.</div>`}${!showAll && rows.length>shown.length?`<button class="outline nx-more" data-action="${moreAction}">Show next 40 (${fmt(rows.length-shown.length)} remaining)</button>`:''}`;
   }
   function updateCatalogueResults(reset=false) {
     if(reset) catLimit=40;
@@ -137,7 +137,7 @@
     return `<div class="nx-intro"><div class="nx-eyebrow">PLUGIN DIRECTORY · ${escCat(name.toUpperCase())}</div><h2>${escCat(name)}</h2><p>${def.note?escCat(def.note):'Catalogue records filed under this category in the supplied MCPTOP snapshot.'}</p><div class="nx-statline"><b>${fmt(rows.length)}</b><span>records in this section</span></div><small class="nx-smallnote">Original source category: ${escCat(sourceText)}</small></div>
       <div class="nx-searchbox"><span>⌕</span><input id="nxCategorySearch" placeholder="Search ${escCat(name)} by name, publisher or description" autocomplete="off"></div>
       <div class="nx-countline" id="nxCategoryCount">${fmt(rows.length)} records</div>
-      <div id="nxCategoryResults" class="nx-results">${resultsHtml(rows,'loadCatalogueCategoryMore')}</div>
+      <div id="nxCategoryResults" class="nx-results">${resultsHtml(rows,'',true)}</div>
       <button class="outline" data-page="plugins">Back to Plugins</button>`;
   }
   function updateCategoryResults(reset=false) {
@@ -148,7 +148,7 @@
     const q=($cat('#nxCategorySearch')?.value||'').trim().toLowerCase();
     const rows=categoryRows(name).filter(r=>!q||String(r.searchFields||'').toLowerCase().includes(q));
     const count=$cat('#nxCategoryCount'); if(count) count.textContent=`${fmt(rows.length)} records`;
-    const result=$cat('#nxCategoryResults'); if(result) result.innerHTML=resultsHtml(rows,'loadCatalogueCategoryMore');
+    const result=$cat('#nxCategoryResults'); if(result) result.innerHTML=resultsHtml(rows,'',true);
   }
   function provenancePage() {
     const rows=(C.snapshots||[]).map(s=>`<div class="nx-snapshot-row"><b>${escCat(s.snapshotDate)} · page ${s.apiPageNumber} of ${s.pagesInSnapshotAccordingToHeader}</b><span>Header count ${fmt(s.snapshotHeaderCount)} · supplied rows ${fmt(s.recordsInSuppliedPdfPart)} · ranks ${s.rankCoverage?.[0]}–${s.rankCoverage?.[1]}</span><span>${escCat(s.pdfFilename)}</span><span>Source: ${escCat(s.sourceName)} · ${escCat(s.sourceParameter)} · ${escCat(s.metric)}</span><span>URL: ${escCat(s.sourceUrl)} (${escCat(s.sourceUrlStatus)})</span><span>${fmt(s.partialExtractions)} partial extractions · ${fmt(s.missingNames)} missing names</span></div>`).join('');
@@ -186,8 +186,6 @@
       catLimit+=40; updateCatalogueResults(false);
     } else if(action==='browseCatalogueCategory'){
       prefs.catalogueCategoryName=element?.dataset?.category||''; nav('catalogueCategory');
-    } else if(action==='loadCatalogueCategoryMore'){
-      catLimit+=40; updateCategoryResults(false);
     } else if(action==='filterByFamily'){
       const fid=element?.dataset?.family||''; prefs.catalogueInitialFamily=fid; nav('pluginCatalogue');
     } else baseCatalogueHandle(action,element);
