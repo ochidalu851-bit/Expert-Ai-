@@ -62,6 +62,38 @@
   const newNoteworthy = [
     ['iCloud Mail','Read and manage iCloud email','✉'],['iCloud Calendar','Read and manage iCloud events','1']
   ];
+  const byName = new Map();
+  groupsV.forEach(g=>g.items.forEach(a=>byName.set(a[0],{name:a[0],description:a[1],icon:a[2],locked:a[3]==='locked',image:a[4]||'',category:g.name,source:'Supplied screen recording · 2026-11-10'})));
+  newNoteworthy.forEach(a=>byName.set(a[0],{name:a[0],description:a[1],icon:a[2],locked:false,image:'',category:'New & noteworthy',source:'Supplied screen recording · 2026-11-10'}));
+  const knownImages = {
+    'Gmail':'assets/plugins/gmail.jpg','Google Drive':'assets/plugins/google_drive.jpg','GitHub':'assets/plugins/github.jpg',
+    'Canva':'assets/plugins/canva.jpg','Higgsfield':'assets/plugins/higgsfield.jpg','Outlook Email':'assets/plugins/outlook_email.jpg',
+    'Slack':'assets/plugins/slack.jpg','Hostinger Mail':'assets/plugins/hostinger_mail.jpg','Teams':'assets/plugins/teams.jpg','Plugin Management':'assets/plugins/plugin_management.jpg'
+  };
+  const getAdded=()=>{
+    if(!Array.isArray(prefs.videoPluginAdded)) prefs.videoPluginAdded=[];
+    if(!prefs.videoPluginAdded.includes('Plugin Management')) {
+      prefs.videoPluginAdded.push('Plugin Management');
+      save();
+    }
+    return prefs.videoPluginAdded;
+  };
+  const addItem=(name)=>{
+    const a=getAdded();
+    if(name && !a.includes(name)) a.push(name);
+    if(!a.includes('Plugin Management')) a.push('Plugin Management');
+    save();
+  };
+  const removeItem=(name)=>{
+    if(name==='Plugin Management') {
+      getAdded();
+      toast('Plugin Management is a permanent built-in app and cannot be uninstalled.');
+      return false;
+    }
+    prefs.videoPluginAdded=getAdded().filter(x=>x!==name);
+    save();
+    return true;
+  };
   const catalogueCategorySourcesV = {
     'Productivity':['productivity'],
     'Communication':['communication'],
@@ -78,26 +110,10 @@
     'Security':['security'],
     'Other':['other']
   };
-  const catalogueRecordsV = window.NEXA_PLUGIN_CATALOGUE?.records || [];
-  const catalogueCategoryCountsV = Object.fromEntries(Object.entries(catalogueCategorySourcesV).map(([label,source])=>[
+  const catalogueRecordsV=window.NEXA_PLUGIN_CATALOGUE?.records||[];
+  const catalogueCategoryCountsV=Object.fromEntries(Object.entries(catalogueCategorySourcesV).map(([label,source])=>[
     label,catalogueRecordsV.filter(record=>(record.categories||[]).some(value=>source.includes(String(value).toLowerCase()))).length
   ]));
-  const byName = new Map();
-  groupsV.forEach(g=>g.items.forEach(a=>byName.set(a[0],{name:a[0],description:a[1],icon:a[2],locked:a[3]==='locked',image:a[4]||'',category:g.name,source:'Supplied screen recording · 2026-11-10'})));
-  newNoteworthy.forEach(a=>byName.set(a[0],{name:a[0],description:a[1],icon:a[2],locked:false,image:'',category:'New & noteworthy',source:'Supplied screen recording · 2026-11-10'}));
-  const knownImages = {
-    'Gmail':'assets/plugins/gmail.jpg','Google Drive':'assets/plugins/google_drive.jpg','GitHub':'assets/plugins/github.jpg',
-    'Canva':'assets/plugins/canva.jpg','Higgsfield':'assets/plugins/higgsfield.jpg','Outlook Email':'assets/plugins/outlook_email.jpg',
-    'Slack':'assets/plugins/slack.jpg','Hostinger Mail':'assets/plugins/hostinger_mail.jpg','Teams':'assets/plugins/teams.jpg','Plugin Management':'assets/plugins/plugin_management.jpg'
-  };
-  const getAdded=()=>{
-    if(!Array.isArray(prefs.videoPluginAdded)){prefs.videoPluginAdded=['Plugin Management'];save();}
-    return prefs.videoPluginAdded;
-  };
-  const addItem=(name)=>{
-    const a=getAdded(); if(!a.includes(name)) a.push(name); save();
-  };
-  const removeItem=(name)=>{prefs.videoPluginAdded=getAdded().filter(x=>x!==name);save();};
   const pluginIcon=(item)=>{
     const src=item.image||knownImages[item.name];
     return src?`<img class="video-plugin-icon" src="${escV(src)}" alt="">`:`<span class="video-plugin-icon video-plugin-monogram" data-monogram="${escV(item.icon||item.name.slice(0,1))}">${escV(item.icon||item.name.slice(0,1))}</span>`;
@@ -106,7 +122,9 @@
   function itemRow(item){
     const added=getAdded().includes(item.name);
     const lock=item.locked;
-    const right=lock?`<button class="video-plugin-lock" data-action="videoPluginLocked" data-plugin="${escV(item.name)}" aria-label="Connection requires approval">♙</button>`:
+    const right=item.name==='Plugin Management'
+      ? `<span class="video-plugin-add is-added" role="img" aria-label="Permanently installed">✓</span>`
+      : lock?`<button class="video-plugin-lock" data-action="videoPluginLocked" data-plugin="${escV(item.name)}" aria-label="Connection requires approval">♙</button>`:
       `<button class="video-plugin-add ${added?'is-added':''}" data-action="toggleVideoPlugin" data-plugin="${escV(item.name)}" aria-label="${added?'Remove':'Add'} ${escV(item.name)}">${added?'✓':'＋'}</button>`;
     return `<div class="video-plugin-row"><button class="video-plugin-main" data-action="openVideoPluginDetail" data-plugin="${escV(item.name)}">${pluginIcon(item)}<span class="video-plugin-copy"><b>${escV(item.name)}</b><small>${escV(item.description)}</small></span></button>${right}</div>`;
   }
@@ -124,20 +142,19 @@
     return `<div class="video-plugin-page">
       <div class="video-plugin-section-head"><button data-action="openVideoPluginInstalled">Installed <span>›</span></button></div>
       ${installedCard()}
-      ${groupsV.slice(0,1).map(g=>`<section class="video-plugin-category video-popular"><button class="video-plugin-section-head" data-page="videoPopular"><span>${escV(g.name)}</span><span>4</span><span>›</span></button></section>`).join('')}
-      <section class="video-plugin-category"><button class="video-plugin-section-head" data-page="newNoteworthy"><span>New & noteworthy</span><span>2</span><span>›</span></button></section>
+      ${groupsV.slice(0,1).map(g=>`<section class="video-plugin-category video-popular"><button class="video-plugin-section-head" data-page="videoPopular"><span>${escV(g.name)}</span><span>${g.items.length}</span><span>›</span></button><div class="video-plugin-items" ${hidden[g.name]?'hidden':''}>${g.items.map(a=>itemRow(byName.get(a[0]))).join('')}</div></section>`).join('')}
+      <section class="video-plugin-category"><button class="video-plugin-section-head" data-page="newNoteworthy"><span>New & noteworthy</span><span>${newNoteworthy.length}</span><span>›</span></button><div class="video-plugin-items">${newNoteworthy.map(a=>itemRow(byName.get(a[0]))).join('')}</div></section>
       ${groupsV.slice(1).map(g=>{
         const title=g.name;
         const count=catalogueCategoryCountsV[title]||0;
-        return `<section class="video-plugin-category"><button class="video-plugin-section-head" data-action="browseCatalogueCategory" data-category="${escV(title)}"><span>${escV(title)}</span><span>${count.toLocaleString()}</span><span>›</span></button></section>`;
+        return `<section class="video-plugin-category"><button class="video-plugin-section-head" data-action="browseCatalogueCategory" data-category="${escV(title)}"><span>${escV(title)}</span><span>${count.toLocaleString()}</span><span>›</span></button><div class="video-plugin-items" ${hidden[title]?'hidden':''}>${g.items.map(a=>itemRow(byName.get(a[0]))).join('')}</div></section>`;
       }).join('')}
       <div class="video-plugin-footer-links"><button class="outline" data-page="capabilityFamilies">12 capability families</button></div>
       <div class="search-dock video-plugin-search"><span>⌕</span><input id="pluginSearch" placeholder="Search plugins" autocomplete="off"></div>
     </div>`;
   }
   function popularPluginsPage(){
-    const items=groupsV[0].items;
-    return `<div class="video-plugin-section-head static-head">Popular</div><div class="video-plugin-items">${items.map(a=>itemRow(byName.get(a[0]))).join('')}</div>
+    return `<div class="video-plugin-section-head static-head">Popular</div><div class="video-plugin-items">${groupsV[0].items.map(a=>itemRow(byName.get(a[0]))).join('')}</div>
       <div class="video-plugin-footer-links"><button class="outline" data-page="plugins">Back to Plugins</button></div>`;
   }
   function newNoteworthyPage(){
@@ -172,7 +189,6 @@
         <button class="video-plugin-action-row" data-action="pluginManagementAction" data-plugin-action="get plugin dependencies">get plugin dependencies <span>›</span></button>
       </div>
       <div class="video-plugin-info"><div class="video-plugin-section-head static-head">Write actions</div>
-        <button class="video-plugin-action-row" data-action="pluginManagementAction" data-plugin-action="uninstall app">Uninstall app <span>›</span></button>
         <button class="video-plugin-action-row" data-action="pluginManagementAction" data-plugin-action="update app permissions">Update app permissions <span>›</span></button>
       </div>
       <button class="outline" data-page="plugins">Back to Plugins</button>
@@ -214,7 +230,7 @@
   function currentChatMessages(){return prefs.temporaryChat?(prefs.temporaryMessages||[]):(prefs.chatHistory||[]);}
   function chatPageWithActions(){
     const msgs=currentChatMessages();
-    const thread=msgs.length?`<div class="chat-thread">${msgs.map((m,i)=>`<div class="chat-message-wrap ${m.role==='user'?'user-message-wrap':'assistant-message-wrap'}"><div class="chat-bubble ${m.role==='user'?'user-bubble':'assistant-bubble'}">${escV(m.text)}</div>${m.role==='assistant'?`<div class="video-message-toolbar"><button data-action="chatMessageAction" data-message-index="${i}" data-message-action="copy" aria-label="Copy">▢</button><button data-action="chatMessageAction" data-message-index="${i}" data-message-action="like" aria-label="Good response">♧</button><button data-action="chatMessageAction" data-message-index="${i}" data-message-action="dislike" aria-label="Bad response">♧</button><button data-action="chatMessageAction" data-message-index="${i}" data-message-action="read" aria-label="Read aloud">◖</button><button data-action="chatMessageAction" data-message-index="${i}" data-message-action="share" aria-label="Share">↗</button><button data-action="chatOptions" aria-label="More response actions">⋮</button></div>`:''}</div>`).join('')}</div>`:`<div class="chat-welcome"><h2>What would you like help with?</h2><p>I can help you learn, create, research or organize your work.</p></div>`;
+    const thread=msgs.length?`<div class="chat-thread">${msgs.map((m,i)=>`<div class="chat-message-wrap"><div class="chat-bubble ${m.role==='user'?'user-bubble':'assistant-bubble'}">${escV(m.text)}</div>${m.role==='assistant'?`<div class="video-message-toolbar"><button data-action="chatMessageAction" data-message-index="${i}" data-message-action="copy" aria-label="Copy">▢</button><button data-action="chatMessageAction" data-message-index="${i}" data-message-action="like" aria-label="Good response">♧</button><button data-action="chatMessageAction" data-message-index="${i}" data-message-action="dislike" aria-label="Bad response">♧</button><button data-action="chatMessageAction" data-message-index="${i}" data-message-action="read" aria-label="Read aloud">◖</button><button data-action="chatMessageAction" data-message-index="${i}" data-message-action="share" aria-label="Share">↗</button><button data-action="chatOptions" aria-label="More response actions">⋮</button></div>`:''}</div>`).join('')}</div>`:`<div class="chat-welcome"><h2>What would you like help with?</h2><p>I can help you learn, create, research or organize your work.</p></div>`;
     return `${prefs.temporaryChat?'<div class="temporary-pill">◌　Temporary chat</div>':''}${prefs.chatPinned?'<div class="video-chat-state">📌 Pinned conversation</div>':''}${prefs.chatLocked?'<div class="video-chat-state">🔒 Locked in this demo</div>':''}${thread}<div class="chat-composer"><button data-action="composerPlus" aria-label="Add">＋</button><input id="chatInput" placeholder="Reply to ChatGPT"><button data-action="voiceInput" aria-label="Microphone">♩</button><button class="voice-send" data-page="voiceMode" aria-label="Voice conversation">◖</button><button class="send-button" data-action="sendChat" aria-label="Send">↑</button></div>`;
   }
   function openVideoChatMenu(){
@@ -269,8 +285,6 @@
       infoModal('App permissions',`${name}: current app permission information is not supplied by the video or connected provider. Current demo-wide setting: ${prefs.permissionMode||'Always ask'}. No external permissions were inspected.`);
     } else if(action==='get plugin dependencies'){
       infoModal('Plugin dependencies',`Dependencies for ${name} are not supplied / not verified in the source recording. No external dependency lookup was made.`);
-    } else if(action==='uninstall app'){
-      infoModal('Uninstall Plugin Management?','This removes only the local demo entry. No external application or account will be uninstalled.',[{label:'Uninstall from this demo',value:'uninstallManager'}]);
     } else if(action==='update app permissions'){
       infoModal('Update app permissions','Select the local demo permission mode. This does not change a real provider permission.',[
         {label:'Always ask',value:'perm:Always ask'},{label:'Allow read actions',value:'perm:Allow read actions'},{label:'Allow low-risk actions',value:'perm:Allow low-risk actions'}
@@ -313,6 +327,12 @@
     if(action==='openVideoPluginDetail'){prefs.activeVideoPlugin=element?.dataset?.plugin||'Plugin Management';save();nav('videoPluginDetail');}
     else if(action==='toggleVideoPlugin'){
       const name=element?.dataset?.plugin||''; if(!name)return;
+      if(name==='Plugin Management'){
+        getAdded();
+        toast('Plugin Management is permanently installed and cannot be removed.');
+        render();
+        return;
+      }
       if(getAdded().includes(name)){removeItem(name);toast(name+' removed from demo apps.');}
       else {addItem(name);toast(name+' added to demo apps. External connection not made.');}
       render();
@@ -332,7 +352,6 @@
       const v=element?.dataset?.modalValue||'';
       if(doModalChoice(v))return;
       if(v.startsWith('perm:')){prefs.permissionMode=v.slice(5);save();modalLayer.hidden=true;render();toast('Demo permission preference updated.');}
-      else if(v==='uninstallManager'){removeItem('Plugin Management');modalLayer.hidden=true;nav('plugins');toast('Plugin Management removed from this demo.');}
     }
     else if(action==='chatMessageAction'){
       const i=Number(element?.dataset?.messageIndex),what=element?.dataset?.messageAction;const msg=currentChatMessages()[i];
