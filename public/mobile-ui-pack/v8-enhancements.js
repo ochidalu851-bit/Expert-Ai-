@@ -159,8 +159,8 @@
       camera:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M7 16.5h7l3.4-5h13.2l3.4 5H41a3.5 3.5 0 0 1 3.5 3.5v18A3.5 3.5 0 0 1 41 41.5H7A3.5 3.5 0 0 1 3.5 38V20A3.5 3.5 0 0 1 7 16.5Z"/><circle cx="24" cy="28.5" r="8.3"/></svg>`,
       photos:`<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="4.5" y="5" width="39" height="38" rx="5.5"/><circle cx="31.5" cy="16.5" r="4.2"/><path d="m6.5 34 9-8.5a4 4 0 0 1 5.6 0L40 43"/></svg>`,
       files:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M17 20v13a7 7 0 0 0 14 0V14a9 9 0 0 0-18 0v20a13 13 0 0 0 26 0V17"/></svg>`,
-      plugins:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M18 7v8M30 7v8M14 15h20v8a10 10 0 0 1-10 10v7M18 15v-4m12 4v-4M17 41h14"/></svg>`,
-      think:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8.5 33.5a19 19 0 1 1 31 0"/><path d="m24 25 11-11"/><circle cx="24" cy="26" r="4"/></svg>`
+      plugins:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M36.5 30.5a18 18 0 1 1-2.1-18.7"/><path d="M17.2 20.2 21 16.4a6.2 6.2 0 0 1 8.8 0l1.8 1.8a6.2 6.2 0 0 1 0 8.8l-4.8 4.8a6.2 6.2 0 0 1-8.8 0l-1.8-1.8"/><path d="m18.7 15.2 4.2 4.2m-7.1 8.1 4.2 4.2"/></svg>`,
+      think:`<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8.5 34a19 19 0 1 1 31 0"/><path d="M24 24 34.5 13.5"/><circle cx="24" cy="25.5" r="4.2"/></svg>`
     };
     const items=[
       ['Camera','v8Camera','camera'],
